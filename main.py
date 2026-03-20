@@ -37,15 +37,24 @@ async def say(ctx, *, message):
 
 @bot.event
 async def on_member_join(member):
-    guild = member.guild
-    channel_id = 1470597378116681812
-    channel = bot.get_channel(channel_id)
+    channel = bot.get_channel(1470941203343216843)
     if channel:
-        human_count = len([m for m in guild.members if not m.bot])
-        ordinal = 'st' if human_count % 10 == 1 and human_count % 100 != 11 else 'nd' if human_count % 10 == 2 and human_count % 100 != 12 else 'rd' if human_count % 10 == 3 and human_count % 100 != 13 else 'th'
-        emoji_badge = '<:Welcome0:1484564259395604572><:Welcome1:1484564289309380780><:Welcome2:1484564315888681000><:Welcome3:1484564376995234037>'
-        msg = f"{emoji_badge} ** to Liberty County State Roleplay Community (LCSRPC), {member.mention}.** You are our `{human_count}{ordinal}` member. > Thanks for joining, and have a wonderful day!"
-        await channel.send(msg)
+        await channel.send(member.mention)
+
+        # Image Embed 1
+        embed1 = nextcord.Embed(color=0xffffff)
+        embed1.set_image(url="https://cdn.discordapp.com/attachments/1484676715010588793/1484676770224410775/alrwelc.png?ex=69bf187d&is=69bdc6fd&hm=93aa43677dac68a2b37ac68dc12d7f151c4d45cdf9a7f976df3e9e88b17022d1&")
+
+        # Text Embed 2
+        embed2 = nextcord.Embed(
+            title="**Welcome to Liberty County State!**",
+            description="> Thank you for joining LCSRPC, {member.mention}.\n\nLiberty County State Roleplay Community is an ER:LC private server, focused on the community surrounding Liberty County. Departments/Jobs are similar to the ER:LC counterparts, however reflect enhanced realism and roleplay. Liberty County State attempts to host sessions frequently throughout the week, ensuring activity to bring more fun.\n> 1. You must read our server-rules listed in <#1410039042938245163>.\n> 2. You must verify with our automation services in <#1470597322499952791>.\n> 3. In order to learn more about our community, please evaluate our <#1470597313343787030>.\n> 4. If you are ever in need of staff to answer any of your questions, you can create a **General Inquiry** ticket in <#1470597331551387702>.\n\nOtherwise, have a fantastic day, and we hope to see you interact with our community events, channels, and features.".format(member=member)
+        )
+
+        embed3 = nextcord.Embed(color=0xffffff)
+        embed1.set_image(url="https://cdn.discordapp.com/attachments/1484676715010588793/1484678139601879170/infolo_1.png?ex=69bf19c4&is=69bdc844&hm=d4966d0d1c6f8faca710c8e1dc078ee1b47d9cb12b417450db6d18071f8ce8d3&")
+
+        await channel.send(embeds=[embed1, embed2, embed3])
 
 app = flask.Flask(__name__)
 
