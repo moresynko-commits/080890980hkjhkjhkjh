@@ -1,13 +1,12 @@
 import nextcord
-from nextcord import app_commands, Interaction
+from nextcord.ext import commands
 import flask
 import os
-import time
 import threading
 import asyncio
 import logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
@@ -15,34 +14,31 @@ if not BOT_TOKEN:
     logger.error("BOT_TOKEN required!")
     exit(1)
 
-GUILD_ID = 1289789596238086194
-ALLOWED_ROLE_IDS = [1470596832794251408, 1470596825575854223, 1470596818298601567]
-WELCOME_CHANNEL_ID = 1470597378116681812
-
 intents = nextcord.Intents.default()
 intents.members = True
 intents.message_content = True
 
-bot = nextcord.Client(intents=intents, sync_commands=True)
+bot = commands.Bot(command_prefix='>', intents=intents)
 
 @bot.event
 async def on_ready():
-    logger.info(f'{bot.user} logged in!')
-    activity = nextcord.Activity(type=nextcord.ActivityType.watching, name="Liberty County | /say")
-    await bot.change_presence(activity=activity, status=nextcord.Status.online)
-    logger.info(f'Synced commands to {len(bot.tree.get_commands())}')
+    logger.info(f'{bot.user} logged in! Guilds: {len(bot.guilds)}')
+    activity = nextcord.Activity(name="Liberty County | >say", type=nextcord.ActivityType.watching)
+    await bot.change_presence(activity=activity)
 
-@bot.tree.command(guild=nextcord.Object(id=GUILD_ID), name='say', description='Say message as bot')
-async def say(interaction: Interaction, message: str):
-    if not any(role.id in ALLOWED_ROLE_IDS for role in interaction.user.roles):
-        return await interaction.response.send_message("No permission!", ephemeral=True)
-    await interaction.response.defer()
-    await interaction.channel.send(message)
-    await interaction.delete_original_response()
+@bot.command()
+async def say(ctx, *, message):
+    # Simple role check - hardcoded admin roles
+    allowed_roles = [1470596832794251408, 1470596825575854223, 1470596818298601567]
+    if not any(role.id in allowed_roles for role in ctx.author.roles):
+        return await ctx.send("No permission!", delete_after=5)
+    await ctx.message.delete()
+    await ctx.send(message)
 
 @bot.event
 async def on_member_join(member):
-    channel = bot.get_channel(WELCOME_CHANNEL_ID)
+    channel_id = 1470597378116681812
+    channel = bot.get_channel(channel_id)
     if channel:
         await channel.send(f"Welcome {member.mention}!")
 
@@ -50,25 +46,22 @@ app = flask.Flask(__name__)
 
 @app.route('/')
 def home():
-    return {"status": "alive"}
+    return {"status": "alive", "bot": str(bot.user) if bot.is_ready() else "starting"}
 
 @app.route('/status')
 def status():
-    uptime = time.time() - bot.start_time if hasattr(bot, 'start_time') else 0
     return {
         "flask": True,
         "bot_ready": bot.is_ready(),
         "guilds": len(bot.guilds),
-        "uptime": uptime
+        "latency": bot.latency if bot.is_ready() else 0
     }
 
 def run_flask():
     port = int(os.environ.get('PORT', 5000))
-    logger.info(f"Flask on {port}")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=False)
 
-if __name__ == '__main__':
-    bot.start_time = time.time()
+if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     asyncio.run(bot.start(BOT_TOKEN))
