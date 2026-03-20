@@ -1,6 +1,6 @@
 import nextcord
 from nextcord.ext import commands
-from nextcord import Interaction
+from nextcord import Interaction, app_commands
 import flask
 import os
 import time
@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 # Config - token required, others hardcoded
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN env var required!")
+    logger.error("BOT_TOKEN env var required!")
+    exit(1)
 
 GUILD_ID = 1289789596238086194
 ALLOWED_ROLE_IDS = [1470596832794251408, 1470596825575854223, 1470596818298601567]
@@ -25,16 +26,17 @@ intents = nextcord.Intents.default()
 intents.members = True
 intents.message_content = True
 
-bot = commands.Bot(command_prefix='>', intents=intents, sync_commands=True)
+bot = commands.Bot(command_prefix='>', intents=intents)
+bot.tree = app_commands.CommandTree(bot)
 
 @bot.event
 async def on_ready():
-    logger.info(f'{bot.user} has logged in! Connected to {len(bot.guilds)} guilds.')
+    synced = await bot.tree.sync(guild=nextcord.Object(id=GUILD_ID))
+    logger.info(f'{bot.user} logged in! Synced {len(synced)} slash commands to guild {GUILD_ID}. Guilds: {len(bot.guilds)}.')
     activity = nextcord.Activity(type=nextcord.ActivityType.watching, name="Liberty County | /say")
     await bot.change_presence(activity=activity, status=nextcord.Status.online)
-    logger.info("Bot ready! Slash commands auto-synced.")
 
-@bot.slash_command(guild_ids=[GUILD_ID], description='Say a message as the bot (admin only)')
+@bot.tree.command(guild=nextcord.Object(id=GUILD_ID), name='say', description='Say a message as the bot (admin only)')
 async def say(interaction: Interaction, message: str):
     if not any(role.id in ALLOWED_ROLE_IDS for role in interaction.user.roles):
         await interaction.response.send_message("❌ No permission!", ephemeral=True)
@@ -49,17 +51,17 @@ async def on_member_join(member):
     if channel:
         await channel.send(f"Welcome {member.mention} to Liberty County State Roleplay!")
 
-# Simple Flask app for health checks (Render)
+# Simple Flask app for Render health
 app = flask.Flask(__name__)
 
 @app.route('/')
 def home():
-    return {'status': 'alive', 'service': 'LCSRPC Simplified Bot'}
+    return {'status': 'alive', 'service': 'LCSRPC Bot'}
 
 @app.route('/status')
 def status():
-    uptime = time.time() - bot_start_time if 'bot_start_time' in globals() else 0
-    ready = bot.is_ready() if hasattr(bot, 'is_ready') else False
+    uptime = time.time() - getattr(bot, 'start_time', 0)
+    ready = bot.is_ready()
     return {
         'flask_alive': True,
         'bot_ready': ready,
@@ -69,22 +71,19 @@ def status():
 
 def run_flask():
     port = int(os.environ.get('PORT', 10000))
-    logger.info(f'Starting Flask on port {port}')
+    logger.info(f"Flask starting on port {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
 
 if __name__ == '__main__':
-    global bot_start_time
-    bot_start_time = time.time()
+    bot.start_time = time.time()
     
-    # Start Flask in daemon thread
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     
-    # Run bot
     try:
         asyncio.run(bot.start(BOT_TOKEN))
     except KeyboardInterrupt:
-        logger.info('Shutting down...')
+        logger.info('Shutdown...')
     finally:
         if not bot.is_closed():
             asyncio.run(bot.close())
