@@ -3,7 +3,6 @@ from nextcord.ext import commands
 import flask
 import os
 import threading
-import asyncio
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -115,7 +114,7 @@ async def on_member_join(member):
         human_count = len([m for m in guild.members if not m.bot])
         ordinal = 'st' if human_count % 10 == 1 and human_count % 100 != 11 else 'nd' if human_count % 10 == 2 and human_count % 100 != 12 else 'rd' if human_count % 10 == 3 and human_count % 100 != 13 else 'th'
         emoji_badge = '<:Welcome0:1484564259395604572><:Welcome1:1484564289309380780><:Welcome2:1484564315888681000><:Welcome3:1484564376995234037>'
-        msg = f"{emoji_badge} **to Liberty County State Roleplay Community.** You are our `{human_count}{ordinal}` member. > Thanks for participating in our community by joining and we hope to see you soon!"
+        msg = f"{emoji_badge} **to Liberty County State Roleplay Community.** You are our `{human_count}{ordinal}` member.\\n> Thanks for participating in our community by joining and we hope to see you soon!"
         await channel_text.send(msg)
 
     # Embed welcome to 1470941203343216843
@@ -128,8 +127,8 @@ async def on_member_join(member):
 
         embed2 = nextcord.Embed(
             color=0xffffff,
-            title="**Welcome to Liberty County State!**",
-            description="**Welcome to Liberty County State!**\\n> Thank you for joining LCSRPC, {member.mention}.\\n\\nLiberty County State Roleplay Community is an ER:LC private server, focused on the community surrounding Liberty County. Departments/Jobs are similar to the ER:LC counterparts, however reflect enhanced realism and roleplay. Liberty County State attempts to host sessions frequently throughout the week, ensuring activity to bring more fun.\\n\\n> 1. You must read our server-rules listed in <#1410039042938245163>.\\n> 2. You must verify with our automation services in <#1470597322499952791>.\\n> 3. In order to learn more about our community, please evaluate our <#1470597313343787030>.\\n> 4. If you are ever in need of staff to answer any of your questions, you can create a **General Inquiry** ticket in <#1470597331551387702>.\\n\\nOtherwise, have a fantastic day, and we hope to see you interact with our community events, channels, and features.".format(member=member)
+            title="Welcome to Liberty County State!",
+            description="> Thank you for joining LCSRPC, {member.mention}.\\n\\nLiberty County State Roleplay Community is an ER:LC private server, focused on the community surrounding Liberty County. Departments/Jobs are similar to the ER:LC counterparts, however reflect enhanced realism and roleplay. Liberty County State attempts to host sessions frequently throughout the week, ensuring activity to bring more fun.\\n\\n> 1. You must read our server-rules listed in <#1410039042938245163>.\\n> 2. You must verify with our automation services in <#1470597322499952791>.\\n> 3. In order to learn more about our community, please evaluate our <#1470597313343787030>.\\n> 4. If you are ever in need of staff to answer any of your questions, you can create a **General Inquiry** ticket in <#1470597331551387702>.\\n\\nOtherwise, have a fantastic day, and we hope to see you interact with our community events, channels, and features.".format(member=member)
         )
 
         embed3 = nextcord.Embed(color=0xffffff)
