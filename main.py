@@ -37,10 +37,15 @@ async def say(ctx, *, message):
 
 @bot.event
 async def on_member_join(member):
+    guild = member.guild
     channel_id = 1470597378116681812
     channel = bot.get_channel(channel_id)
     if channel:
-        await channel.send(f"Welcome {member.mention}!")
+        human_count = len([m for m in guild.members if not m.bot])
+        ordinal = 'st' if human_count % 10 == 1 and human_count % 100 != 11 else 'nd' if human_count % 10 == 2 and human_count % 100 != 12 else 'rd' if human_count % 10 == 3 and human_count % 100 != 13 else 'th'
+        emoji_badge = '<:Welcome0:1484564259395604572><:Welcome1:1484564289309380780><:Welcome2:1484564315888681000><:Welcome3:1484564376995234037>'
+        msg = f"{emoji_badge} **Welcome to Liberty County State Roleplay Community (LCSRPC), {member.mention}. You are our `{human_count}{ordinal}` member. Thanks for joining, and have a wonderful day!**"
+        await channel.send(msg)
 
 app = flask.Flask(__name__)
 
