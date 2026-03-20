@@ -114,7 +114,7 @@ async def on_member_join(member):
         human_count = len([m for m in guild.members if not m.bot])
         ordinal = 'st' if human_count % 10 == 1 and human_count % 100 != 11 else 'nd' if human_count % 10 == 2 and human_count % 100 != 12 else 'rd' if human_count % 10 == 3 and human_count % 100 != 13 else 'th'
         emoji_badge = '<:Welcome0:1484564259395604572><:Welcome1:1484564289309380780><:Welcome2:1484564315888681000><:Welcome3:1484564376995234037>'
-        msg = f"{emoji_badge} **to Liberty County State Roleplay Community.** You are our `{human_count}{ordinal}` member.\n> Thanks for participating in our community by joining and we hope to see you soon!"
+        msg = f"{emoji_badge} **to Liberty County State Roleplay Community, {member.mention}.** You are our `{human_count}{ordinal}` member.\n> Thanks for participating in our community by joining and we hope to see you soon!"
         await channel_text.send(msg)
 
     # Embed welcome to 1470941203343216843
