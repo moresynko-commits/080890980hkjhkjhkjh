@@ -1,6 +1,6 @@
 import nextcord
 from nextcord.ext import commands
-from nextcord.ui import View, Button, Modal, TextInput
+import nextcord.ui
 import flask
 import os
 import threading
@@ -22,261 +22,222 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix='>', intents=intents)
 
+# Globals
 GLOBAL_GUILD_ID = 1289789596238086194
 SESSION_CHANNEL_ID = 1470597340992901204
 VOTE_CHANNEL_ID = 1471995054238208223
 STATUS_CHANNEL_ID = 1484693321128349786
 NAME_CHANGE_CHANNEL_ID = 1480013219199451308
-PROTECTED_CHANNEL_ID = 1464682633559801939
 PROTECTED_MSG_ID = 1480023088799416451
 SESSION_PING_ROLE_ID = 1470597003292573787
 MANAGEMENT_ROLE_ID = 1470596840369164288
-ON_DUTY_ROLE_ID = 1470596847423852758
 CHECKMARK_EMOJI_ID = 1480018743714386070
-LCSRPC_EMOJI_ID = 1484385207455846513
 
-session_data = {"active": False, "start_time": None, "starter_id": None, "cooldowns": {}, "pending_votes": {}}
+session_data = {"active": False, "cooldowns": {}, "pending_votes": {}}
 
-class VoteModal(Modal):
+class VoteModal(nextcord.ui.Modal):
     def __init__(self):
-        super().__init__(title="Session Vote Threshold")
-        self.threshold = TextInput(label="Vote threshold", default="5", max_length=2)
+        super().__init__(title="Vote Threshold")
+        self.add_item(nextcord.ui.TextInput(label="Number", default="5"))
 
-    async def on_submit(self, interaction):
+    async def callback(self, interaction):
         try:
-            threshold = int(self.threshold.value)
+            threshold = int(self.children[0].value)
             guild = interaction.guild
-            vote_channel = guild.get_channel(VOTE_CHANNEL_ID)
-            embed = nextcord.Embed(title="__Session Vote__", description=f"React <:Checkmark:{CHECKMARK_EMOJI_ID}> **Needed: {threshold}**", color=0xffffff)
-            msg = await vote_channel.send(embed=embed)
+            ch = guild.get_channel(VOTE_CHANNEL_ID)
+            embed = nextcord.Embed(title="__Vote__", description=f"React <:Checkmark:{CHECKMARK_EMOJI_ID}> ({threshold} needed)", color=0xffffff)
+            msg = await ch.send(embed=embed)
             await msg.add_reaction(f"<:Checkmark:{CHECKMARK_EMOJI_ID}>")
             session_data["pending_votes"][msg.id] = threshold
             await interaction.response.send_message("Vote posted!", ephemeral=True)
         except:
-            await interaction.response.send_message("Error!", ephemeral=True)
+            await interaction.response.send_message("Invalid!", ephemeral=True)
 
-class SessionsView(View):
-    def __init__(self, active):
+class SessionsView(nextcord.ui.View):
+    def __init__(self):
         super().__init__(timeout=1800)
-        self.active = active
 
     async def interaction_check(self, interaction):
         if MANAGEMENT_ROLE_ID not in [r.id for r in interaction.user.roles]:
-            await interaction.response.send_message("Management only.", ephemeral=True)
+            await interaction.response.send_message("No permission!", ephemeral=True)
             return False
         return True
 
-    @Button(label="Vote", style=nextcord.ButtonStyle.primary)
-    async def vote(self, interaction, button):
+    @nextcord.ui.button(label="Vote", style=nextcord.ButtonStyle.primary)
+    async def vote(self, interaction: nextcord.Interaction, button: nextcord.ui.Button):
         if session_data["active"]:
-            await interaction.response.send_message("Session active.", ephemeral=True)
+            await interaction.response.send_message("Active session.", ephemeral=True)
             return
         await interaction.response.send_modal(VoteModal())
 
-    @Button(label="Start", style=nextcord.ButtonStyle.green)
-    async def start(self, interaction, button):
+    @nextcord.ui.button(label="Start", style=nextcord.ButtonStyle.green)
+    async def start(self, interaction: nextcord.Interaction, button: nextcord.ui.Button):
         if session_data["active"]:
             await interaction.response.send_message("Already active.", ephemeral=True)
             return
         session_data["active"] = True
-        session_data["start_time"] = datetime.utcnow().isoformat()
-        session_data["starter_id"] = interaction.user.id
         await set_session_active(interaction.guild, True)
         await delete_msgs(SESSION_CHANNEL_ID, interaction.guild)
         role = interaction.guild.get_role(SESSION_PING_ROLE_ID)
-        channel = interaction.guild.get_channel(SESSION_CHANNEL_ID)
-        embed = nextcord.Embed(title="__Session Start__", description="Session begun! Code: LCsRp", color=0xffffff)
-        await channel.send(role.mention, embed=embed)
+        ch = interaction.guild.get_channel(SESSION_CHANNEL_ID)
+        embed = nextcord.Embed(title="__Session Started__", description="Code: LCsRp", color=0x00ff00)
+        await ch.send(role.mention, embed=embed)
         await interaction.response.send_message("Started!", ephemeral=True)
 
-    @Button(label="Boost", style=nextcord.ButtonStyle.blurple)
-    async def boost(self, interaction, button):
+    @nextcord.ui.button(label="Boost", style=nextcord.ButtonStyle.blurple)
+    async def boost(self, interaction: nextcord.Interaction, button: nextcord.ui.Button):
         if not session_data["active"]:
             await interaction.response.send_message("Not active.", ephemeral=True)
             return
         role = interaction.guild.get_role(SESSION_PING_ROLE_ID)
-        channel = interaction.guild.get_channel(SESSION_CHANNEL_ID)
-        embed = nextcord.Embed(title="__Session Boost__", description="Boosted!", color=0xffffff)
-        await channel.send(role.mention, embed=embed)
+        ch = interaction.guild.get_channel(SESSION_CHANNEL_ID)
+        embed = nextcord.Embed(title="__Boost__", description="Join now!", color=0x5865f2)
+        await ch.send(role.mention, embed=embed)
         await interaction.response.send_message("Boosted!", ephemeral=True)
 
-    @Button(label="Shutdown", style=nextcord.ButtonStyle.red)
-    async def shutdown(self, interaction, button):
+    @nextcord.ui.button(label="Shutdown", style=nextcord.ButtonStyle.red)
+    async def shutdown(self, interaction: nextcord.Interaction, button: nextcord.ui.Button):
         if not session_data["active"]:
             await interaction.response.send_message("Not active.", ephemeral=True)
             return
         now = datetime.utcnow().isoformat()
         if "shutdown" in session_data["cooldowns"]:
-            last = datetime.fromisoformat(session_data["cooldowns"]["shutdown"])
-            if (datetime.utcnow() - last) < timedelta(minutes=15):
-                await interaction.response.send_message("Cooldown!", ephemeral=True)
+            if (datetime.utcnow() - datetime.fromisoformat(session_data["cooldowns"]["shutdown"])) < timedelta(minutes=15):
+                await interaction.response.send_message("15min cooldown!", ephemeral=True)
                 return
         session_data["active"] = False
         await set_session_active(interaction.guild, False)
         await delete_msgs(SESSION_CHANNEL_ID, interaction.guild)
-        channel = interaction.guild.get_channel(SESSION_CHANNEL_ID)
-        embed = nextcord.Embed(title="__Session Shutdown__", description="Ended.", color=0xff0000)
-        await channel.send(embed=embed)
+        ch = interaction.guild.get_channel(SESSION_CHANNEL_ID)
+        embed = nextcord.Embed(title="__Shutdown__", description="Ended.", color=0xff0000)
+        await ch.send(embed=embed)
         session_data["cooldowns"]["shutdown"] = now
         await interaction.response.send_message("Shutdown!", ephemeral=True)
 
-    @Button(label="Full", style=nextcord.ButtonStyle.danger)
-    async def full(self, interaction, button):
+    @nextcord.ui.button(label="Full", style=nextcord.ButtonStyle.danger)
+    async def full(self, interaction: nextcord.Interaction, button: nextcord.ui.Button):
         if not session_data["active"]:
             await interaction.response.send_message("Not active.", ephemeral=True)
             return
         role = interaction.guild.get_role(SESSION_PING_ROLE_ID)
-        channel = interaction.guild.get_channel(SESSION_CHANNEL_ID)
-        embed = nextcord.Embed(title="__Session Full__", description="Full!", color=0xff0000)
-        await channel.send(role.mention, embed=embed)
-        await interaction.response.send_message("Full sent!", ephemeral=True)
+        ch = interaction.guild.get_channel(SESSION_CHANNEL_ID)
+        embed = nextcord.Embed(title="__Full__", description="Session full!", color=0xff0000)
+        await ch.send(role.mention, embed=embed)
+        await interaction.response.send_message("Full!", ephemeral=True)
 
 async def set_session_active(guild, active):
-    channel = guild.get_channel(NAME_CHANGE_CHANNEL_ID)
-    if channel:
-        name = "Sessions: 🟢" if active else "Sessions: 🔴"
-        await channel.edit(name=name)
+    ch = guild.get_channel(NAME_CHANGE_CHANNEL_ID)
+    if ch:
+        await ch.edit(name="Sessions: 🟢" if active else "Sessions: 🔴")
 
-async def delete_msgs(channel_id, guild):
-    channel = guild.get_channel(channel_id)
-    if channel:
-        async for msg in channel.history(limit=50):
+async def delete_msgs(ch_id, guild):
+    ch = guild.get_channel(ch_id)
+    if ch:
+        async for msg in ch.history(limit=50):
             if msg.id != PROTECTED_MSG_ID:
                 try:
                     await msg.delete()
                 except:
                     pass
 
-@bot.command(aliases=['p'])
+@bot.command(aliases=["p"])
 async def sessions(ctx):
     if MANAGEMENT_ROLE_ID not in [r.id for r in ctx.author.roles]:
-        await ctx.reply("No permission.", ephemeral=True)
+        await ctx.reply("No!", ephemeral=True)
         return
-    active = session_data["active"]
-    embed = nextcord.Embed(title="__Session Panel__", description=f"Active: {active}", color=0xffffff)
-    view = SessionsView(active)
+    embed = nextcord.Embed(title="__Sessions__", description=f"Active: {session_data['active']}", color=0xffffff)
+    view = SessionsView()
     await ctx.reply(embed=embed, view=view, ephemeral=True)
 
 @bot.event
-async def on_raw_reaction_add(payload):
-    global session_data
-    if payload.channel_id != VOTE_CHANNEL_ID:
-        return
-    if payload.emoji.id != CHECKMARK_EMOJI_ID:
+async def on_raw_reaction_add(self, payload):
+    if payload.channel_id != VOTE_CHANNEL_ID or payload.emoji.id != CHECKMARK_EMOJI_ID:
         return
     guild = bot.get_guild(GLOBAL_GUILD_ID)
-    channel = guild.get_channel(VOTE_CHANNEL_ID)
-    msg = await channel.fetch_message(payload.message_id)
+    ch = guild.get_channel(VOTE_CHANNEL_ID)
+    msg = await ch.fetch_message(payload.message_id)
     threshold = session_data["pending_votes"].get(msg.id, 5)
-    reaction = msg.reactions[0]
-    users = await reaction.users().flatten()
-    count = len([u for u in users if not u.bot])
+    rxn = msg.reactions[0]
+    users = await rxn.users().flatten()
+    count = sum(1 for u in users if not u.bot)
     if count >= threshold:
         session_data["active"] = True
         await set_session_active(guild, True)
-        await msg.reply("Threshold met! Started.")
-        session_data["pending_votes"].pop(msg.id)
+        await msg.reply("Started by votes!")
+        session_data["pending_votes"].pop(msg.id, None)
 
 @bot.event
 async def on_ready():
-    logger.info(f'{bot.user} has logged in to {len(bot.guilds)} guilds.')
-    activity = nextcord.Activity(name="Liberty County State | dsc.gg/lcsrpc", type=nextcord.ActivityType.watching)
-    await bot.change_presence(activity=activity)
+    logger.info(f'{bot.user} logged in!')
+    await bot.change_presence(activity=nextcord.Activity(name="Liberty County State | dsc.gg/lcsrpc", type=nextcord.ActivityType.watching))
 
 @bot.command()
 async def say(ctx, *, message):
-    allowed_roles = [1470596832794251408, 1470596825575854223, 1470596818298601567]
-    if not any(role.id in allowed_roles for role in ctx.author.roles):
-        await ctx.send("No permission!", delete_after=5)
+    if not any(r.id in [1470596832794251408, 1470596825575854223, 1470596818298601567] for r in ctx.author.roles):
+        await ctx.send("No!", delete_after=5)
         return
     await ctx.message.delete()
     await ctx.send(message)
 
 @bot.command()
 async def dmuser(ctx, userid: str, *, message):
-    exec_roles = [1470596825575854223, 1470596832794251408, 1470596818298601567]
-    if not any(role.id in exec_roles for role in ctx.author.roles):
-        await ctx.send("No permission!", delete_after=5)
+    if not any(r.id in [1470596825575854223, 1470596832794251408, 1470596818298601567] for r in ctx.author.roles):
+        await ctx.send("No!", delete_after=5)
         return
     await ctx.message.delete()
-    guild = bot.get_guild(1289789596238086194)
-    if not guild:
-        await ctx.send("Guild not found!", delete_after=5)
-        return
+    g = bot.get_guild(1289789596238086194)
+    user = await commands.MemberConverter().convert(ctx, userid) if userid.startswith('<') else await bot.fetch_user(int(userid))
+    nick = (g.get_member(user.id) or user).nick or user.display_name
+    e = nextcord.Embed(title="LCSRPC DM", description=f"> From **{nick}**: {message}", timestamp=ctx.message.created_at)
+    e.set_footer(text=e.timestamp.strftime('%I:%M%p'))
     try:
-        user_id = int(''.join(filter(str.isdigit, userid)))
-        user = await bot.fetch_user(user_id)
+        await user.send(embed=e)
+        await ctx.send("Sent!", delete_after=5)
     except:
-        try:
-            user = await commands.MemberConverter().convert(ctx, userid)
-        except:
-            await ctx.send("Invalid user!", delete_after=5)
-            return
-    member = guild.get_member(user.id)
-    nick = member.nick if member and member.nick else user.display_name
-    embed = nextcord.Embed(title="# <:Offical_server:1475860128686411837> LCSRPC DM")
-    embed.description = f"> From **{nick}**:\n> {message}"
-    embed.timestamp = ctx.message.created_at
-    embed.set_footer(text=ctx.message.created_at.strftime('%I:%M%p'))
-    try:
-        await user.send(embed=embed)
-        await ctx.send("DM sent!", delete_after=5)
-    except:
-        await ctx.send("DM failed!", delete_after=5)
+        await ctx.send("Failed!", delete_after=5)
 
 @bot.command()
 async def dmrole(ctx, roleid: str, *, message):
-    if 1470596818298601567 not in [role.id for role in ctx.author.roles]:
-        await ctx.send("No permission!", delete_after=5)
+    if 1470596818298601567 not in [r.id for r in ctx.author.roles]:
+        await ctx.send("No!", delete_after=5)
         return
     await ctx.message.delete()
-    guild = bot.get_guild(1289789596238086194)
-    if not guild:
-        await ctx.send("Guild not found!", delete_after=5)
+    g = bot.get_guild(1289789596238086194)
+    role_id = int(''.join(c for c in roleid if c.isdigit()))
+    role = g.get_role(role_id)
+    if not role or len([m for m in role.members if not m.bot]) > 50:
+        await ctx.send("Invalid or too big!", delete_after=5)
         return
-    try:
-        role_id = int(''.join(filter(str.isdigit, roleid)))
-        role = guild.get_role(role_id)
-    except:
-        await ctx.send("Invalid role!", delete_after=5)
-        return
-    if len(role.members) > 50:
-        await ctx.send("Too many members!", delete_after=5)
-        return
-    embed_base = nextcord.Embed(title="# <:Offical_server:1475860128686411837> LCSRPC DM")
-    embed_base.timestamp = ctx.message.created_at
     sent = 0
     for m in role.members:
         if m.bot:
             continue
         nick = m.nick or m.display_name
-        embed = embed_base.copy()
-        embed.description = f"> From **{nick}**:\n> {message}"
-        embed.set_footer(text=ctx.message.created_at.strftime('%I:%M%p'))
+        e = nextcord.Embed(title="LCSRPC DM", description=f"> From **{nick}**: {message}", timestamp=ctx.message.created_at)
+        e.set_footer(text=e.timestamp.strftime('%I:%M%p'))
         try:
-            await m.send(embed=embed)
+            await m.send(embed=e)
             sent += 1
         except:
             pass
-    await ctx.send(f"DM'd {sent}/{len([m for m in role.members if not m.bot])}", delete_after=5)
+    await ctx.send(f"Sent to {sent}", delete_after=5)
 
 @bot.event
 async def on_member_join(member):
-    ch_text = bot.get_channel(1470597378116681812)
-    if ch_text:
-        g = member.guild
-        count = len([m for m in g.members if not m.bot])
-        ordi = 'st' if count % 10 == 1 and count % 100 != 11 else 'nd' if count % 10 == 2 else 'rd' if count % 10 == 3 else 'th'
-        badge = '<:Welcome0:1484564259395604572><:Welcome1:1484564289309380780><:Welcome2:1484564315888681000><:Welcome3:1484564376995234037>'
-        msg = f"{badge} **to LCSRPC, {member.mention}!** You are our `{count}{ordi}` member. Thanks!"
-        await ch_text.send(msg)
-    ch_embed = bot.get_channel(1470941203343216843)
-    if ch_embed:
-        await ch_embed.send(member.mention)
-        e1 = nextcord.Embed(color=0xffffff).set_image(url="https://cdn.discordapp.com/attachments/1484676715010588793/1484676770224410775/alrwelc.png?ex=69bf187d&is=69bdc6fd&hm=93aa43677dac68a2b37ac68dc12d7f151c4d45cdf9a7f976df3e9e88b17022d1&")
-        e2 = nextcord.Embed(title="**Welcome to Liberty County State!**", color=0xffffff, description="> Thank you for joining LCSRPC, {member.mention}.\\n\\nLiberty County State Roleplay Community is an ER:LC private server... [full text]")
-        e3 = nextcord.Embed(color=0xffffff).set_image(url="https://cdn.discordapp.com/attachments/1484676715010588793/1484678139601879170/infolo_1.png")
-        await ch_embed.send(embeds=[e1, e2, e3])
+    # Text welcome
+    ch = bot.get_channel(1470597378116681812)
+    if ch:
+        count = len([m for m in member.guild.members if not m.bot])
+        ordinal = lambda n: "st" if n%10==1 and n%100!=11 else "nd" if n%10==2 else "rd" if n%10==3 else "th"
+        msg = f"<:Welcome0:1484564259395604572><:Welcome1:1484564289309380780><:Welcome2:1484564315888681000><:Welcome3:1484564376995234037> **to LCSRPC {member.mention}!** {count}{ordinal(count)} member!"
+        await ch.send(msg)
+    # Embed welcome
+    ch = bot.get_channel(1470941203343216843)
+    if ch:
+        await ch.send(member.mention)
+        e1 = nextcord.Embed(color=0xffffff).set_image(url="https://cdn.discordapp.com/attachments/1484676715010588793/1484676770224410775/alrwelc.png")
+        e2 = nextcord.Embed(title="Welcome to Liberty County State!", description="> Thank you {member.mention}. Liberty County State is ER:LC RP server. Read rules <#1410039042938245163>, verify <#1470597322499952791>, info <#1470597313343787030>, ticket <#1470597331551387702>.".format(member=member), color=0xffffff)
+        await ch.send(embeds=[e1, e2])
 
 app = flask.Flask(__name__)
 
@@ -286,13 +247,13 @@ def home():
 
 @app.route('/status')
 def status():
-    return {"flask": True, "bot_ready": bot.is_ready(), "guilds": len(bot.guilds)}
+    return {"bot": bot.is_ready(), "guilds": len(bot.guilds)}
 
 def run_flask():
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), debug=False)
 
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     bot.run(BOT_TOKEN)
+
