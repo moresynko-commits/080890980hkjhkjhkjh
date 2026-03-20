@@ -23,7 +23,7 @@ bot = commands.Bot(command_prefix='>', intents=intents)
 @bot.event
 async def on_ready():
     logger.info(f'{bot.user} logged in! Guilds: {len(bot.guilds)}')
-    activity = nextcord.Activity(name="Liberty County | >say", type=nextcord.ActivityType.watching)
+    activity = nextcord.Activity(name="Liberty County State | dsc.gg/lcsrpc", type=nextcord.ActivityType.watching)
     await bot.change_presence(activity=activity)
 
 @bot.command()
