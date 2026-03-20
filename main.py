@@ -35,6 +35,78 @@ async def say(ctx, *, message):
     await ctx.message.delete()
     await ctx.send(message)
 
+@bot.command()
+async def dmuser(ctx, userid: str, *, message: str):
+    exec_roles = [1470596825575854223, 1470596832794251408, 1470596818298601567]  # Board of Executives+
+    if not any(role.id in exec_roles for role in ctx.author.roles):
+        return await ctx.send("No permission!", delete_after=5)
+    await ctx.message.delete()
+
+    guild = bot.get_guild(1289789596238086194)
+    if not guild:
+        return await ctx.send("Guild not found!", delete_after=5)
+
+    try:
+        user_id = int(''.join(filter(str.isdigit, userid)))
+        user = await bot.fetch_user(user_id)
+    except:
+        try:
+            user = await commands.MemberConverter().convert(ctx, userid)
+        except:
+            return await ctx.send("Invalid user!", delete_after=5)
+
+    member = guild.get_member(user.id)
+    nickname = member.nick if member and member.nick else user.display_name
+
+    embed = nextcord.Embed(title="# <:Offical_server:1475860128686411837> __LCSRPC - New Direct Message (DM)__")
+    embed.add_field(name="", value=f"> From **{nickname}**:\n> {message}", inline=False)
+    embed.timestamp = ctx.message.created_at
+    embed.set_footer(text=ctx.message.created_at.strftime('%I:%M%p'))
+
+    try:
+        await user.send(embed=embed)
+        await ctx.send("DM sent!", delete_after=5)
+    except:
+        await ctx.send("Failed to send DM!", delete_after=5)
+
+@bot.command()
+async def dmrole(ctx, roleid: str, *, message: str):
+    if 1470596818298601567 not in [role.id for role in ctx.author.roles]:
+        return await ctx.send("No permission!", delete_after=5)
+    await ctx.message.delete()
+
+    guild = bot.get_guild(1289789596238086194)
+    if not guild:
+        return await ctx.send("Guild not found!", delete_after=5)
+
+    try:
+        role_id = int(''.join(filter(str.isdigit, roleid)))
+        role = guild.get_role(role_id)
+        if not role:
+            return await ctx.send("Role not found!", delete_after=5)
+    except:
+        return await ctx.send("Invalid role!", delete_after=5)
+
+    if len(role.members) > 50:
+        return await ctx.send("Too many members!", delete_after=5)
+
+    embed_base = nextcord.Embed(title="# <:Offical_server:1475860128686411837> __LCSRPC - New Direct Message (DM)__")
+    embed_base.timestamp = ctx.message.created_at
+    sent = 0
+    for member in role.members:
+        if member.bot:
+            continue
+        nick = member.nick or member.display_name
+        embed = embed_base.copy()
+        embed.add_field(name="", value=f"> From **{nick}**:\n> {message}", inline=False)
+        embed.set_footer(text=ctx.message.created_at.strftime('%I:%M%p'))
+        try:
+            await member.send(embed=embed)
+            sent += 1
+        except:
+            pass
+    await ctx.send(f"DM sent to {sent}/{len(role.members)}!", delete_after=5)
+
 @bot.event
 async def on_member_join(member):
     channel = bot.get_channel(1470941203343216843)
@@ -47,12 +119,14 @@ async def on_member_join(member):
 
         # Text Embed 2
         embed2 = nextcord.Embed(
+            color=0xffffff,
             title="**Welcome to Liberty County State!**",
             description="> Thank you for joining LCSRPC, {member.mention}.\n\nLiberty County State Roleplay Community is an ER:LC private server, focused on the community surrounding Liberty County. Departments/Jobs are similar to the ER:LC counterparts, however reflect enhanced realism and roleplay. Liberty County State attempts to host sessions frequently throughout the week, ensuring activity to bring more fun.\n> 1. You must read our server-rules listed in <#1410039042938245163>.\n> 2. You must verify with our automation services in <#1470597322499952791>.\n> 3. In order to learn more about our community, please evaluate our <#1470597313343787030>.\n> 4. If you are ever in need of staff to answer any of your questions, you can create a **General Inquiry** ticket in <#1470597331551387702>.\n\nOtherwise, have a fantastic day, and we hope to see you interact with our community events, channels, and features.".format(member=member)
         )
 
+        # Image Embed 3
         embed3 = nextcord.Embed(color=0xffffff)
-        embed1.set_image(url="https://cdn.discordapp.com/attachments/1484676715010588793/1484678139601879170/infolo_1.png?ex=69bf19c4&is=69bdc844&hm=d4966d0d1c6f8faca710c8e1dc078ee1b47d9cb12b417450db6d18071f8ce8d3&")
+        embed3.set_image(url="https://cdn.discordapp.com/attachments/1484676715010588793/1484678139601879170/infolo_1.png?ex=69bf19c4&is=69bdc844&hm=d4966d0d1c6f8faca710c8e1dc078ee1b47d9cb12b417450db6d18071f8ce8d3&")
 
         await channel.send(embeds=[embed1, embed2, embed3])
 
@@ -73,9 +147,9 @@ def status():
 
 def run_flask():
     port = int(os.environ.get('PORT', 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    asyncio.run(bot.start(BOT_TOKEN))
+    bot.run(BOT_TOKEN)
