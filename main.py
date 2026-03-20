@@ -67,11 +67,11 @@ class SessionsView(View):
             return False
         return True
 
-    @Button(label="Session Vote", style=nextcord.ButtonStyle.primary, row=0, disabled_property="active")
+@Button(label="Session Vote", style=nextcord.ButtonStyle.primary, row=0, disabled=self.active)
     async def vote(self, interaction, button):
         await interaction.response.send_modal(VoteModal())
 
-    @Button(label="Start", style=nextcord.ButtonStyle.green, row=0, disabled_property="active")
+    @Button(label="Start", style=nextcord.ButtonStyle.green, row=0, disabled=self.active)
     async def start(self, interaction, button):
         global session_data
         session_data["active"] = True
@@ -84,14 +84,14 @@ class SessionsView(View):
         await interaction.guild.get_channel(SESSION_CHANNEL_ID).send(role.mention, embed=embed)
         await interaction.response.send_message("Started!", ephemeral=True)
 
-    @Button(label="Boost", style=nextcord.ButtonStyle.blurple, row=1, disabled_property="not active")
+    @Button(label="Boost", style=nextcord.ButtonStyle.blurple, row=1, disabled=not self.active)
     async def boost(self, interaction, button):
         embed = nextcord.Embed(title="__Session Boost__", description="Session boosted!", color=0xffffff)
         role = interaction.guild.get_role(SESSION_PING_ROLE_ID)
         await interaction.guild.get_channel(SESSION_CHANNEL_ID).send(role.mention, embed=embed)
         await interaction.response.send_message("Boosted!", ephemeral=True)
 
-    @Button(label="Shutdown", style=nextcord.ButtonStyle.red, row=1, disabled_property="not active")
+    @Button(label="Shutdown", style=nextcord.ButtonStyle.red, row=1, disabled=not self.active)
     async def shutdown(self, interaction, button):
         global session_data
         now = datetime.utcnow().isoformat()
@@ -108,7 +108,7 @@ class SessionsView(View):
         session_data["cooldowns"]["shutdown"] = now
         await interaction.response.send_message("Shutdown!", ephemeral=True)
 
-    @Button(label="Full", style=nextcord.ButtonStyle.danger, row=1, disabled_property="not active")
+    @Button(label="Full", style=nextcord.ButtonStyle.danger, row=1, disabled=not self.active)
     async def full(self, interaction, button):
         embed = nextcord.Embed(title="__Session Full__", description="Session full!", color=0xff0000)
         role = interaction.guild.get_role(SESSION_PING_ROLE_ID)
