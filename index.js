@@ -32,6 +32,9 @@ const ADMIN_ROLES = ['1470596825575854223', '1470596832794251408', '147059681829
 const LEADERSHIP_ROLE = '1470596818298601567';
 
 let sessionData = { active: false, cooldowns: {}, pendingVotes: {}, starterId: null, startTime: null, checkTimers: [], voteMsgIds: [] };
+let afkUsers = {}; // {userId: {reason, oldNick, pings: []}}
+
+const AFK_PREFIX = 'AFK | ';
 
 const app = express();
 app.use(express.json());
@@ -348,7 +351,45 @@ if (interaction.isModalSubmit() && interaction.customId === 'vote_modal') {
 });
 
 client.on('messageCreate', async message => {
-  if (message.author.bot || !message.content.startsWith('>')) return;
+  const authorId = message.author.id;
+  const guild = message.guild;
+  
+  // AFK check first
+  if (afkUsers[authorId]) {
+    const afkData = afkUsers[authorId];
+    const member = guild.members.cache.get(authorId);
+    if (member) {
+      member.setNickname(afkData.oldNick).catch(console.error);
+    }
+    const pingsList = afkData.pings.map(id => `<@${id}>`).join(', ') || 'No one';
+    const embedOff = new EmbedBuilder()
+      .setTitle('**Back from AFK**')
+      .setDescription(`**${message.member.displayName}**\n> You are back from AFK.\n> **Mentions while AFK:** ${pingsList}`)
+      .setColor(0xffffff);
+    message.reply({ embeds: [embedOff] }).catch(() => {});
+    delete afkUsers[authorId];
+    return; // Stop processing command
+  }
+  
+  if (message.mentions.users.size > 0) {
+    message.mentions.users.forEach(mentioned => {
+      if (afkUsers[mentioned.id]) {
+        const afkData = afkUsers[mentioned.id];
+        message.reply(`\`${afkData.oldNick}\` is currently AFK: ${afkData.reason}`).catch(() => {});
+        afkData.pings.push(message.author.id);
+      }
+    });
+  }
+  
+  // AFK mentions check (after command processing)
+  message.mentions.users.forEach(mentioned => {
+    const mentionedId = mentioned.id;
+    if (afkUsers[mentionedId]) {
+      const afkData = afkUsers[mentionedId];
+      message.channel.send(`\`${afkData.oldNick}\` is currently AFK: ${afkData.reason}`);
+      afkData.pings.push(message.author.id);
+    }
+  });
   
   const args = message.content.slice(1).trim().split(/ +/);
   const command = args.shift().toLowerCase();
