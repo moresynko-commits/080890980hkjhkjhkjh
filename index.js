@@ -197,18 +197,20 @@ if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !i
       const isActive = await getSessionActive(guild);
       
       switch (value) {
-        case 'session_vote':
-const modal = new ModalBuilder()
+case 'session_vote':
+  const modal = new ModalBuilder()
             .setCustomId('vote_modal')
             .setTitle('Session Vote');
           const input = new TextInputBuilder()
             .setCustomId('threshold')
             .setLabel('How many votes do you wish the session vote receive before you are notified to begin a new session?')
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder('1-14')
+            .setPlaceholder('5')
+            .setMinLength(1)
             .setMaxLength(2);
           modal.addComponents(new ActionRowBuilder().addComponents(input));
-          return interaction.showModal(modal);
+          await interaction.showModal(modal);
+
 
         
         case 'session_start':
