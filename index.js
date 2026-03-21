@@ -20,7 +20,7 @@ const GUILD_ID = '1289789596238086194';
 const SESSION_CHANNEL = '1470597340992901204';
 const VOTE_CHANNEL = '1471995054238208223';
 const NAME_CHANNEL = '1480013219199451308';
-const PROTECTED_MSG = '1484781311380951062';
+const PROTECTED_MSG = '1484784024491790469';
 
 
 
@@ -255,25 +255,10 @@ case 'session_vote':
           const parentCat = guild.channels.cache.get(SESSION_PARENT_CAT);
           if (parentCh && parentCat) {
             try {
-const divider = await guild.channels.create({
-                name: '⎯⎯⎯⎯⎯⎯⎯',
-                type: ChannelType.GuildVoice,
-                position: parentCh.position + 1,
-                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]
-              });
+const divider = await guild.channels.create({\n                name: '⎯⎯⎯⎯⎯⎯⎯',\n                type: ChannelType.GuildVoice,\n                parent: parentCat.id,\n                position: parentCh.position + 1,\n                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]\n              });
 
-              const ingame = await guild.channels.create({
-                name: 'In-Game: LCsRp',
-                type: ChannelType.GuildVoice,
-                position: divider.position + 1,
-                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]
-              });
-              const players = await guild.channels.create({
-                name: 'Players: 0/40',
-                type: ChannelType.GuildVoice,
-                position: ingame.position + 1,
-                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]
-              });
+const ingame = await guild.channels.create({\n                name: 'In-Game: LCsRp',\n                type: ChannelType.GuildVoice,\n                parent: parentCat.id,\n                position: divider.position + 1,\n                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]\n              });
+const players = await guild.channels.create({\n                name: 'Players: 0/40',\n                type: ChannelType.GuildVoice,\n                parent: parentCat.id,\n                position: ingame.position + 1,\n                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]\n              });
               sessionData.vcChannels = [divider.id, ingame.id, players.id];
               sessionData.playersVcId = players.id;
               // Update players every 2min
@@ -491,6 +476,16 @@ if (interaction.isModalSubmit() && interaction.customId === 'vote_modal') {
 });
 
 client.on('messageCreate', async message => {
+  const BOT_ID = '1484655890966777886';
+  if (message.mentions.has(client.user.id) || message.content.includes(`<@${BOT_ID}>`) || message.content.includes(`<@!${BOT_ID}>`)) {
+    const guild = message.guild;
+    const devUser = await guild.members.fetch('1261535675472281724').catch(() => null);
+    const devNick = devUser ? devUser.displayName : 'Unknown';
+    const embed = new EmbedBuilder()
+      .setDescription(`> \`Prefix:\` **: **\n> \`Developer:\` **${devNick}**\n> \`Description:\` Maintaining ER:LC and Discord Systems for Liberty County State Roleplay Community (LCSRPC).\n> \`Last Deployed:\` <t:${Math.floor(Date.now() / 1000)}:R>`)
+      .setColor(0xffffff);
+    return message.reply({ embeds: [embed] });
+  }
   const authorId = message.author.id;
   const guild = message.guild;
   
@@ -797,7 +792,7 @@ async function clearSession(guild, keepStartEmbed = false) {
   if (!c) return;
   try {
     const messages = await c.messages.fetch({ limit: 50 });
-  const protectedMsg = '1484777918633607228';
+const protectedMsg = PROTECTED_MSG;
 
     const startMsgId = sessionData.startMsgId;
     for (const msg of messages.values()) {
