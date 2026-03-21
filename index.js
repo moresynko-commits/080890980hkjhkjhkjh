@@ -26,12 +26,17 @@ const WELCOME_EMBED = '1470941203343216843';
 const PING_ROLE = '1470597003292573787';
 const CHECKMARK_EMOJI = '1480018743714386070';
 
+const GENERAL_CHANNEL = '1470597378116681812';
+const SESSION_PARENT_CHANNEL = '1484693321128349786';
+const SESSION_PARENT_CAT = '1470597251154972794';
+
 const LCSRPC_EMOJI = '<:LCSRPC:1484385207455846513>';
 const HEAD_IMG = 'https://cdn.discordapp.com/attachments/1484676715010588793/1484693166270714007/lcsrpcsess.png?ex=69bf27c3&is=69bdd643&hm=07aba51b706c19670195fd44dc3f4a09f87a49f2abb8b2096cc97ee19158d06d&';
 const FOOTER_IMG = 'https://cdn.discordapp.com/attachments/1484676715010588793/1484678139601879170/infolo_1.png?ex=69bf19c4&is=69bdc844&hm=d4966d0d1c6f8faca710c8e1dc078ee1b47d9cb12b417450db6d18071f8ce8d3&';
 const ECON_HEADER_IMG = 'https://cdn.discordapp.com/attachments/1484676715010588793/1484755986320330954/econlcs.png?ex=69bf6244&is=69be10c4&hm=cd7f65661d99188815c42560eb732f6969966389ae34b9546cdedc10757a2d65&';
 
 const MGMT_ROLES = ['1470596840369164288', '1470596832794251408', '1470596825575854223', '1470596818298601567'];
+
 const ADMIN_ROLES = ['1470596825575854223', '1470596832794251408', '1470596818298601567'];
 const LEADERSHIP_ROLE = '1470596818298601567';
 
@@ -173,6 +178,61 @@ if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !i
           sessionData.starterId = member.id;
           sessionData.startTime = Date.now();
           sessionData.startMsgId = m.id;
+          
+          // General ping voters
+          const generalCh = guild.channels.cache.get(GENERAL_CHANNEL);
+          if (generalCh) {
+            let voterPings = '';
+            const voteData = Object.values(sessionData.pendingVotes)[0];
+            if (voteData && voteData.voters) {
+              voterPings = voteData.voters.slice(0, 10).map(id => `<@${id}>`).join('\\n- ');
+            }
+            const generalEmbed = new EmbedBuilder()
+              .setTitle(`${LCSRPC_EMOJI} | Session Management`)
+              .setDescription(`> Join the session listed in <#${SESSION_CHANNEL}>, or face moderation!\\n- ${voterPings || 'Staff'}\\n\\n_See you ingame!_`)
+              .setColor(0xffffff);
+            generalCh.send({ embeds: [generalEmbed] });
+          }
+          
+          // Create voice channels
+          const parentCh = guild.channels.cache.get(SESSION_PARENT_CHANNEL);
+          const parentCat = guild.channels.cache.get(SESSION_PARENT_CAT);
+          if (parentCh && parentCat) {
+            try {
+              const divider = await guild.channels.create({
+                name: '⎯⎯⎯⎯⎯⎯',
+                type: ChannelType.GuildVoice,
+                position: parentCh.position + 1,
+                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]
+              });
+              const ingame = await guild.channels.create({
+                name: 'In-Game: LCsRp',
+                type: ChannelType.GuildVoice,
+                position: divider.position + 1,
+                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]
+              });
+              const players = await guild.channels.create({
+                name: 'Players: 0/40',
+                type: ChannelType.GuildVoice,
+                position: ingame.position + 1,
+                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]
+              });
+              sessionData.vcChannels = [divider.id, ingame.id, players.id];
+              sessionData.playersVcId = players.id;
+              // Update players every 2min
+              const updateInterval = setInterval(async () => {
+                const playersVc = guild.channels.cache.get(players.id);
+                if (playersVc) {
+                  const randomPlayers = Math.floor(Math.random() * 10) + 1;
+                  await playersVc.setName(`Players: ${randomPlayers}/40`);
+                }
+              }, 120000);
+              sessionData.vcUpdateInterval = updateInterval;
+            } catch (e) {
+              console.error('VC creation error:', e);
+            }
+          }
+          
           // Schedule 1h DM
   const timer1 = setTimeout(async () => {
             await dmSessionCheck(guild, sessionData.starterId); // First to starter
@@ -180,6 +240,7 @@ if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !i
           sessionData.checkTimers.push(timer1);
           interaction.followUp({ content: 'Session started!', ephemeral: true });
           break;
+
         
         case 'session_boost':
           if (!isActive) return interaction.followUp({ content: 'No active session!', ephemeral: true });
@@ -674,8 +735,21 @@ async function startSession(guild, starterId) {
   console.log('Session started, DM timer set');
 }
 
+
 async function shutdownSession(guild) {
   await clearSession(guild, false);
+  
+  // Delete VC
+  if (sessionData.vcChannels) {
+    for (const vcId of sessionData.vcChannels) {
+      const vc = guild.channels.cache.get(vcId);
+      if (vc) await vc.delete().catch(console.error);
+    }
+  }
+  if (sessionData.vcUpdateInterval) {
+    clearInterval(sessionData.vcUpdateInterval);
+  }
+  
   await set_active(guild, false);
   const sessionChD = guild.channels.cache.get(SESSION_CHANNEL);
   if (sessionChD) {
@@ -686,10 +760,14 @@ async function shutdownSession(guild) {
   sessionData.starterId = null;
   sessionData.startTime = null;
   sessionData.startMsgId = null;
+  sessionData.vcChannels = null;
+  sessionData.playersVcId = null;
+  sessionData.vcUpdateInterval = null;
   sessionData.checkTimers.forEach(t => clearTimeout(t));
   sessionData.checkTimers = [];
-  console.log('Session auto-shutdown');
+  console.log('Session auto-shutdown + VC cleaned');
 }
+
 
 // Helper functions (called from events)
 async function set_active(guild, active) {
