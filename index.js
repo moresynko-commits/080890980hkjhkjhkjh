@@ -43,8 +43,14 @@ const MGMT_ROLES = ['1470596840369164288', '1470596832794251408', '1470596825575
 const ADMIN_ROLES = ['1470596825575854223', '1470596832794251408', '1470596818298601567'];
 const LEADERSHIP_ROLE = '1470596818298601567';
 
-const CHAIRMAN_ROLE = '1470596818298601567'; // Leadership
-const BOD_EXEC_LEAD_ROLES = ADMIN_ROLES; // BOD/Exec/Lead
+const CHAIRMAN_ROLE = '1470596810945859742';
+const LEADERSHIP_IMMUNE = ['1470596818298601567']; // Immune rob/cd
+const COMMUNITY_ROLE = '1470596942198472977';
+const CASH_LORD_ROLE = '1470597009001156620'; // 7.5m
+const MONEY_MAKER_ROLE = '1470597009948934239'; // 5m
+const BANK_WORKER_ROLE = '1470597011047710894'; // 2.5m
+const BOD_EXEC_LEAD_ROLES = ADMIN_ROLES;
+
 const BOT_CHANNELS = ['1470597383480934562', '1484402222640009357', '1470597465681035388'];
 const ECON_LOGS_CHANNEL = '1484755057240047616';
 const TRAINING_REQ_CHANNEL = '1484757004386832434';
@@ -346,10 +352,11 @@ const divider = await guild.channels.create({
     const { commandName } = interaction;
     
 
-  // Channel check for slash econ cmds
-  if (!BOT_CHANNELS.includes(interaction.channel.id) && commandName.startsWith('econ') || commandName === 'requesttraining') {
+  // Channel check for economy slash
+  if (!BOT_CHANNELS.includes(interaction.channel.id) && ['balance', 'bal', 'work', 'daily', 'leaderboard', 'lb'].includes(commandName)) {
     return interaction.reply({ content: 'Economy commands only in bot channels!', ephemeral: true });
   }
+
   
 if (commandName === 'sessions') {
 
@@ -520,21 +527,23 @@ client.on('messageCreate', async message => {
   });
   
 
-  // Channel check for bot commands
-  if (!BOT_CHANNELS.includes(message.channel.id) && message.content.startsWith('>') && !['sessions', 'say', 'dmuser', 'dmrole', 'afk'].includes(command)) {
+// Channel check for economy cmds only
+  if (!BOT_CHANNELS.includes(message.channel.id) && ['bal', 'balance', 'work', 'daily', 'lb', 'leaderboard'].includes(command)) {
     message.delete().catch(() => {});
     const errorEmbed = new EmbedBuilder()
-      .setDescription('Bot commands can only be used in **bot-cmds**, **economy**, or **staff-cmds** channels.')
+      .setDescription('Economy commands can only be used in **bot-cmds**, **economy**, or **staff-cmds** channels.')
       .setColor(0xff0000);
     const errorMsg = await message.channel.send({ embeds: [errorEmbed] });
     setTimeout(() => errorMsg.delete().catch(() => {}), 10000);
     return;
   }
 
+
   const args = message.content.slice(1).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-if (['sessions', 'bal', 'balance', 'work', 'daily', 'lb', 'leaderboard', 'requesttraining', 'afk'].includes(command)) {
+if (command === 'sessions') {
+
     if (command === 'sessions' && (message.guild.id !== GUILD_ID || !MGMT_ROLES.some(id => message.member.roles.cache.has(id)))) {
       const errorMsg = await message.reply('Only Management+ staff members of Liberty County State Roleplay Community are permitted to manage a session. Refrain from using this command again, unless you become Management.');
       setTimeout(() => {
@@ -584,7 +593,80 @@ if (['sessions', 'bal', 'balance', 'work', 'daily', 'lb', 'leaderboard', 'reques
     
     await message.reply({ embeds: [embed1, embed2, embed3], components: [row] });
     await message.delete(); // Auto-delete command
+  } else if (['bal', 'balance'].includes(command)) {
+    const bal = await getBal(message.author.id);
+    const embed = new EmbedBuilder()
+      .setImage(ECON_HEADER_IMG)
+      .setDescription(`**Balance:** $${bal.toLocaleString()}`)
+      .setColor(0x00ff00);
+    message.reply({ embeds: [embed] });
+  } else if (command === 'work') {
+    const cdKey = `work_${message.author.id}`;
+    const now = Date.now();
+    if (sessionData.cooldowns[cdKey] && now - sessionData.cooldowns[cdKey] < 3600000) {
+      const remaining = Math.ceil((3600000 - (now - sessionData.cooldowns[cdKey])) / 60000);
+      return message.reply(`Work on 1h cd. \`${remaining}m\` left.`);
+    }
+    sessionData.cooldowns[cdKey] = now;
+    const reward = 50;
+    const newBal = await addBal(message.author.id, reward, message.author.id);
+    const embed = new EmbedBuilder()
+      .setImage(ECON_HEADER_IMG)
+      .setDescription(`**Worked! +$${reward}**\\n**New Balance: $${newBal.toLocaleString()}**`)
+      .setColor(0x00ff00);
+    message.reply({ embeds: [embed] });
+  } else if (command === 'daily') {
+    const cdKey = `daily_${message.author.id}`;
+    const now = Date.now();
+    if (sessionData.cooldowns[cdKey] && now - sessionData.cooldowns[cdKey] < 86400000) {
+      const remaining = Math.ceil((86400000 - (now - sessionData.cooldowns[cdKey])) / 60000);
+      return message.reply(`Daily on 24h cd. \`${remaining}m\` left.`);
+    }
+    sessionData.cooldowns[cdKey] = now;
+    const reward = 100;
+    const newBal = await addBal(message.author.id, reward, message.author.id);
+    const embed = new EmbedBuilder()
+      .setImage(ECON_HEADER_IMG)
+      .setDescription(`**Daily reward! +$${reward}**\\n**New Balance: $${newBal.toLocaleString()}**`)
+      .setColor(0x00ff00);
+    message.reply({ embeds: [embed] });
+  } else if (['lb', 'leaderboard'].includes(command)) {
+    const sorted = Object.entries(economyData.users).sort(([,a], [,b]) => b - a).slice(0, 10);
+    const lbList = sorted.map(([id, bal], i) => `\`${i+1}.\` <@${id}> $${bal.toLocaleString()}`).join('\\n');
+    const embed = new EmbedBuilder()
+      .setTitle('💰 Leaderboard')
+      .setDescription(lbList || 'No balances yet.')
+      .setColor(0x00ff88)
+      .setImage(ECON_HEADER_IMG);
+    message.reply({ embeds: [embed] });
+  } else if (command === 'requesttraining') {
+    const reqCh = client.channels.cache.get(TRAINING_REQ_CHANNEL);
+    if (message.channel.id !== TRAINING_REQ_CHANNEL) {
+      return message.reply('Training requests in <#' + TRAINING_REQ_CHANNEL + '> only!').then(m => setTimeout(() => m.delete(), 10000));
+    }
+    if (!await getSessionActive(message.guild)) {
+      return message.reply('Session inactive!').then(m => setTimeout(() => m.delete(), 5000));
+    }
+    if (!BOD_EXEC_LEAD_ROLES.some(id => message.member.roles.cache.has(id)) && !message.member.roles.cache.has(TRAINEE_ROLE)) {
+      return message.reply('BOD/Exec/Lead/trainee only!').then(m => setTimeout(() => m.delete(), 5000));
+    }
+    const trainerPing = message.guild.roles.cache.get(TRAINER_ROLE)?.toString() || '<@&1470596876662345790>';
+    await message.delete();
+    const reqEmbed1 = new EmbedBuilder().setImage(HEAD_IMG).setColor(0xffffff);
+    const reqEmbed2 = new EmbedBuilder()
+      .setTitle(`${LCSRPC_EMOJI} | Training Request`)
+      .setDescription(`**${message.member.displayName}** requests training.\\n> Session active. Assign trainer.`)
+      .setColor(0xffffff);
+    const reqEmbed3 = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
+    message.channel.send({ content: `${trainerPing}`, embeds: [reqEmbed1, reqEmbed2, reqEmbed3] });
+  } else if (command === 'afk') {
+    const reason = args.join(' ') || 'AFK';
+    const oldNick = message.member.displayName;
+    afkUsers[message.author.id] = { reason, oldNick, pings: [] };
+    message.member.setNickname(`${AFK_PREFIX}${reason.slice(0, 20)}`).catch(() => {});
+    message.reply(`**AFK: ${reason}**`).then(m => setTimeout(() => m.delete(), 10000));
   }
+
 
   if (command === 'say') {
     if (message.guild.id !== GUILD_ID || !ADMIN_ROLES.some(id => message.member.roles.cache.has(id))) {
