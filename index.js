@@ -707,14 +707,6 @@ client.on('messageCreate', async (message) => {
     });
   }
   
-  // AFK mentions check (after command processing)
-    if (afkUsers[mentionedId]) {
-      const afkData = afkUsers[mentionedId];
-      message.channel.send(`\`${afkData.oldNick}\` is currently AFK: ${afkData.reason}`);
-      afkData.pings.push(message.author.id);
-    }
-  });
-  
   // Channel check for economy cmds only
 if (!message.content.startsWith(':')) return;
   const command = message.content.slice(1).trim().split(/ +/)[0]?.toLowerCase();
