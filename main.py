@@ -36,8 +36,11 @@ ADMIN_ROLES = [EXEC, 1470596832794251408, LEADERSHIP]
 
 session_data = {"active": False, "cooldowns": {}, "pending_votes": {}}
 
-class VoteModal(nextcord.ui.Modal, title="Vote Threshold"):
-    threshold = nextcord.ui.TextInput(label="Votes needed", default="5")
+class VoteModal(nextcord.ui.Modal):
+    def __init__(self):
+        super().__init__(title="Vote Threshold")
+        self.threshold = nextcord.ui.TextInput(label="Votes needed", placeholder="5")
+        self.add_item(self.threshold)
 
     async def on_submit(self, interaction):
         try:
@@ -47,9 +50,9 @@ class VoteModal(nextcord.ui.Modal, title="Vote Threshold"):
             m = await c.send(embed=e)
             await m.add_reaction(f"<:Checkmark:{CHECKMARK}>")
             session_data["pending_votes"][m.id] = t
-            await interaction.response.send_message("Started!", ephemeral=True)
+            await interaction.response.send_message("Vote posted!", ephemeral=True)
         except:
-            await interaction.response.send_message("Invalid!", ephemeral=True)
+            await interaction.response.send_message("Invalid number!", ephemeral=True)
 
 class SessionsView(nextcord.ui.View):
     def __init__(self):
