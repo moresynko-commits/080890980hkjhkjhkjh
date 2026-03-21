@@ -263,7 +263,7 @@ if (commandName === 'sessions') {
       
       const row = new ActionRowBuilder().addComponents(select);
       
-      return interaction.reply({ embeds: [embed1, embed2, embed3], components: [row], ephemeral: true });
+      return interaction.reply({ embeds: [embed1, embed2, embed3], components: [row], ephemeral: false });
     }
     
     if (commandName === 'say') {
