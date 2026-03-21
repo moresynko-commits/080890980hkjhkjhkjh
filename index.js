@@ -280,7 +280,7 @@ client.on('guildMemberAdd', member => {
   // Embed welcome
   const embedCh = client.channels.cache.get(WELCOME_EMBED);
   if (embedCh) {
-    await embedCh.send(member.toString());
+    embedCh.send(member.toString());
     const embed1 = new EmbedBuilder().setColor(0xffffff).setImage('https://cdn.discordapp.com/attachments/1484676715010588793/1484676770224410775/alrwelc.png?ex=69bf187d&is=69bdc6fd&hm=93aa43677dac68a2b37ac68dc12d7f151c4d45cdf9a7f976df3e9e88b17022d1&');
     const embed2 = new EmbedBuilder()
       .setTitle('**Welcome to Liberty County State!**')
