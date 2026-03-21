@@ -31,9 +31,59 @@ app.get('/status', (req, res) => res.json({ status: 'alive', bot: client.isReady
 const port = process.env.PORT || 5000;
 app.listen(port, '0.0.0.0', () => console.log(`Flask on port ${port}`));
 
-client.once('ready', () => {
+client.once('ready', async () => {
   console.log(`${client.user.tag} ready!`);
   client.user.setPresence({ activities: [{ name: 'Liberty County | dsc.gg/lcsrpc', type: 3 }] });
+  const guild = client.guilds.cache.get(GUILD_ID);
+  if (guild) {
+    await guild.commands.set([
+      {
+        name: 'sessions',
+        description: 'Sessions panel'
+      },
+      {
+        name: 'say',
+        description: 'Say something',
+        options: [{
+          type: 3,
+          name: 'msg',
+          description: 'Message',
+          required: true
+        }]
+      },
+      {
+        name: 'dmuser',
+        description: 'DM user',
+        options: [{
+          type: 3,
+          name: 'uid',
+          description: 'User ID/mention',
+          required: true
+        }, {
+          type: 3,
+          name: 'msg',
+          description: 'Message',
+          required: true
+        }]
+      },
+      {
+        name: 'dmrole',
+        description: 'DM role members',
+        options: [{
+          type: 3,
+          name: 'rid',
+          description: 'Role ID/mention',
+          required: true
+        }, {
+          type: 3,
+          name: 'msg',
+          description: 'Message',
+          required: true
+        }]
+      }
+    ]);
+    console.log('Slash commands registered!');
+  }
 });
 
 client.on('interactionCreate', async interaction => {
