@@ -1,6 +1,6 @@
 import nextcord
 from nextcord.ext import commands
-from nextcord import app_commands
+import nextcord.app_commands
 import flask
 import os
 import threading
@@ -199,13 +199,7 @@ async def say(ctx, *, msg):
     await ctx.message.delete()
     await ctx.send(msg)
 
-@bot.tree.command(guild=nextcord.Object(id=GUILD_ID), name="say", description="Admin say message")
-@app_commands.describe(msg="Message to send")
-async def slash_say(interaction: nextcord.Interaction, msg: str):
-    if not any(r.id in ADMIN_ROLES for r in interaction.user.roles):
-        await interaction.response.send_message("No permission!", ephemeral=True)
-        return
-    await interaction.response.send_message(msg)
+bot.tree.add_command(say)
 
 @bot.command()
 async def dmuser(ctx, uid: str, *, msg):
@@ -228,26 +222,6 @@ async def dmuser(ctx, uid: str, *, msg):
         await ctx.send("DM sent!", delete_after=5)
     except:
         await ctx.send("Failed to DM!", delete_after=5)
-
-@bot.tree.command(guild=nextcord.Object(id=GUILD_ID), name="dmuser", description="DM user (Exec+)")
-@app_commands.describe(uid="User ID/mention", msg="Message")
-async def slash_dmuser(interaction: nextcord.Interaction, uid: str, msg: str):
-    if not any(r.id in ADMIN_ROLES for r in interaction.user.roles):
-        await interaction.response.send_message("Exec+ only!", ephemeral=True)
-        return
-    g = bot.get_guild(GUILD_ID)
-    try:
-        user_id = int(uid.lstrip('<@!'))
-        user = g.get_member(user_id) or await bot.fetch_user(user_id)
-    except:
-        await interaction.response.send_message("Invalid user!", ephemeral=True)
-        return
-    e = nextcord.Embed(title="# <:Offical_server:1475860128686411837> __LCSRPC - New Direct Message (DM)__", description=f"> From **{interaction.user.display_name}**:\n> {msg}\n-# Sent at {interaction.created_at.strftime('%I:%M%p')}", color=0x2b2d31)
-    try:
-        await user.send(embed=e)
-        await interaction.response.send_message("DM sent!", ephemeral=True)
-    except:
-        await interaction.response.send_message("Failed to DM!", ephemeral=True)
 
 @bot.command()
 async def dmrole(ctx, rid: str, *, msg):
@@ -275,30 +249,6 @@ async def dmrole(ctx, rid: str, *, msg):
             pass
     await ctx.send(f"DM sent to {count}/{len(r.members)}", delete_after=5)
 
-@bot.tree.command(guild=nextcord.Object(id=GUILD_ID), name="dmrole", description="DM role (Leadership only)")
-@app_commands.describe(rid="Role ID/mention", msg="Message")
-async def slash_dmrole(interaction: nextcord.Interaction, rid: str, msg: str):
-    if LEADERSHIP_ROLE not in [r.id for r in interaction.user.roles]:
-        await interaction.response.send_message("Leadership only!", ephemeral=True)
-        return
-    g = bot.get_guild(GUILD_ID)
-    role_id = int(''.join(d for d in rid if d.isdigit()))
-    r = g.get_role(role_id)
-    if not r or len([m for m in r.members if not m.bot]) > 50:
-        await interaction.response.send_message("Too big/invalid!", ephemeral=True)
-        return
-    count = 0
-    for m in r.members:
-        if m.bot:
-            continue
-        e = nextcord.Embed(title="# <:Offical_server:1475860128686411837> __LCSRPC - New Direct Message (DM)__", description=f"> From **{interaction.user.display_name}**:\n> {msg}\n-# Sent at {interaction.created_at.strftime('%I:%M%p')}", color=0x2b2d31)
-        try:
-            await m.send(embed=e)
-            count += 1
-        except:
-            pass
-    await interaction.response.send_message(f"Sent to {count}", ephemeral=True)
-
 @bot.event
 async def on_member_join(member):
     guild = member.guild
@@ -320,7 +270,7 @@ async def on_member_join(member):
         embed1.set_image(url="https://cdn.discordapp.com/attachments/1484676715010588793/1484676770224410775/alrwelc.png?ex=69bf187d&is=69bdc6fd&hm=93aa43677dac68a2b37ac68dc12d7f151c4d45cdf9a7f976df3e9e88b17022d1&")
         embed2 = nextcord.Embed(
             title="**Welcome to Liberty County State!**",
-            description="> Thank you for joining LCSRPC, {member.mention}.\n\nLiberty County State Roleplay Community is an ER:LC private server, focused on the community surrounding Liberty County. Departments/Jobs are similar to the ER:LC counterparts, however reflect enhanced realism and roleplay. Liberty County State attempts to host sessions frequently throughout the week, ensuring activity to bring more fun.\n> 1. You must read our server-rules listed in <#1410039042938245163>.\n> 2. You must verify with our automation services in <#1470597322499952791>.\n> 3. In order to learn more about our community, please evaluate our <#1470597313343787030>.\n> 4. If you are ever in need of staff to answer any of your questions, you can create a **General Inquiry** ticket in <#1470597331551387702>.\n\nOtherwise, have a fantastic day, and we hope to see you interact with our community events, channels, and features."
+            description="> Thank you for joining LCSRPC, {member.mention}.\\n\\nLiberty County State Roleplay Community is an ER:LC private server, focused on the community surrounding Liberty County. Departments/Jobs are similar to the ER:LC counterparts, however reflect enhanced realism and roleplay. Liberty County State attempts to host sessions frequently throughout the week, ensuring activity to bring more fun.\\n> 1. You must read our server-rules listed in <#1410039042938245163>.\\n> 2. You must verify with our automation services in <#1470597322499952791>.\\n> 3. In order to learn more about our community, please evaluate our <#1470597313343787030>.\\n> 4. If you are ever in need of staff to answer any of your questions, you can create a **General Inquiry** ticket in <#1470597331551387702>.\\n\\nOtherwise, have a fantastic day, and we hope to see you interact with our community events, channels, and features.".format(member=member)
         )
         await ch.send(embeds=[embed1, embed2])
 
