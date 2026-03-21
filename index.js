@@ -1,5 +1,8 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } = require('discord.js');
 const express = require('express');
+
+
+
 const path = require('path');
 
 const client = new Client({ 
@@ -26,8 +29,17 @@ const CHECKMARK_EMOJI = '1480018743714386070';
 const LCSRPC_EMOJI = '<:LCSRPC:1484385207455846513>';
 const HEAD_IMG = 'https://cdn.discordapp.com/attachments/1484676715010588793/1484693166270714007/lcsrpcsess.png?ex=69bf27c3&is=69bdd643&hm=07aba51b706c19670195fd44dc3f4a09f87a49f2abb8b2096cc97ee19158d06d&';
 const FOOTER_IMG = 'https://cdn.discordapp.com/attachments/1484676715010588793/1484678139601879170/infolo_1.png?ex=69bf19c4&is=69bdc844&hm=d4966d0d1c6f8faca710c8e1dc078ee1b47d9cb12b417450db6d18071f8ce8d3&';
+const ECON_HEADER_IMG = 'https://cdn.discordapp.com/attachments/1484676715010588793/1484755986320330954/econlcs.png?ex=69bf6244&is=69be10c4&hm=cd7f65661d99188815c42560eb732f6969966389ae34b9546cdedc10757a2d65&';
 
 const MGMT_ROLES = ['1470596840369164288', '1470596832794251408', '1470596825575854223', '1470596818298601567'];
+const CHAIRMAN_ROLE = '1470596818298601567'; // Leadership
+const BOD_EXEC_LEAD_ROLES = ADMIN_ROLES; // BOD/Exec/Lead
+const BOT_CHANNELS = ['1470597383480934562', '1484402222640009357', '1470597465681035388'];
+const ECON_LOGS_CHANNEL = '1484755057240047616';
+const TRAINING_REQ_CHANNEL = '1484757004386832434';
+const TRAINER_ROLE = '1470596876662345790';
+const TRAINEE_ROLE = '1470596894907695188';
+
 const ADMIN_ROLES = ['1470596825575854223', '1470596832794251408', '1470596818298601567'];
 const LEADERSHIP_ROLE = '1470596818298601567';
 
@@ -224,7 +236,14 @@ if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !i
   if (interaction.isChatInputCommand()) {
     const { commandName } = interaction;
     
+
+  // Channel check for slash econ cmds
+  if (!BOT_CHANNELS.includes(interaction.channel.id) && commandName.startsWith('econ') || commandName === 'requesttraining') {
+    return interaction.reply({ content: 'Economy commands only in bot channels!', ephemeral: true });
+  }
+  
 if (commandName === 'sessions') {
+
       if (!MGMT_ROLES.some(id => interaction.member.roles.cache.has(id))) {
         return interaction.reply({ content: 'Only Management+ staff members of Liberty County State Roleplay Community are permitted to manage a session. Refrain from using this command again, unless you become Management.', ephemeral: true });
       }
@@ -391,10 +410,23 @@ client.on('messageCreate', async message => {
     }
   });
   
+
+  // Channel check for bot commands
+  if (!BOT_CHANNELS.includes(message.channel.id) && message.content.startsWith('>') && !['sessions', 'say', 'dmuser', 'dmrole', 'afk'].includes(command)) {
+    message.delete().catch(() => {});
+    const errorEmbed = new EmbedBuilder()
+      .setDescription('Bot commands can only be used in **bot-cmds**, **economy**, or **staff-cmds** channels.')
+      .setColor(0xff0000);
+    const errorMsg = await message.channel.send({ embeds: [errorEmbed] });
+    setTimeout(() => errorMsg.delete().catch(() => {}), 10000);
+    return;
+  }
+
   const args = message.content.slice(1).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
 if (command === 'sessions') {
+
     if (message.guild.id !== GUILD_ID || !MGMT_ROLES.some(id => message.member.roles.cache.has(id))) {
       const errorMsg = await message.reply('Only Management+ staff members of Liberty County State Roleplay Community are permitted to manage a session. Refrain from using this command again, unless you become Management.');
       setTimeout(() => {
@@ -513,7 +545,7 @@ client.on('guildMemberAdd', member => {
     const humanCount = member.guild.members.cache.filter(m => !m.user.bot).size;
     const ordinal = humanCount % 10 === 1 && humanCount % 100 !== 11 ? 'st' : humanCount % 10 === 2 && humanCount % 100 !== 12 ? 'nd' : humanCount % 10 === 3 && humanCount % 100 !== 13 ? 'rd' : 'th';
     const emojiBadge = '<:Welcome0:1484564259395604572><:Welcome1:1484564289309380780><:Welcome2:1484564315888681000><:Welcome3:1484564376995234037>';
-    const msg = `${emojiBadge} ** to Liberty County State Roleplay Community (LCSRPC), ${member.toString()}.** You are our \`${humanCount}${ordinal}\` member. > Thanks for joining, and have a wonderful day!`;
+    const msg = `${emojiBadge} **to Liberty County State Roleplay Community (LCSRPC), ${member.toString()}.** You are our \`${humanCount}${ordinal}\` member.\n> Thanks for joining, and have a wonderful day!`;
     textCh.send(msg);
   }
   
@@ -529,8 +561,32 @@ client.on('guildMemberAdd', member => {
   }
 });
 
+
+let economyData = { users: {}, logs: [] };
+
+async function getBal(userId) {
+  return economyData.users[userId] || 0;
+}
+
+async function addBal(userId, amt, logBy = null) {
+  const bal = (economyData.users[userId] || 0) + amt;
+  economyData.users[userId] = bal;
+  if (logBy) {
+    economyData.logs.unshift({
+      type: amt > 0 ? 'add' : 'remove',
+      userId,
+      amt: Math.abs(amt),
+      by: logBy,
+      time: Date.now()
+    });
+  }
+  return bal;
+}
+
+
 // Helper functions
 async function getSessionActive(guild) {
+
   const nameCh = guild.channels.cache.get(NAME_CHANNEL);
   return nameCh ? nameCh.name.includes('🟢') : false;
 }
