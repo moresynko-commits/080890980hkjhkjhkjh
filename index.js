@@ -20,7 +20,8 @@ const GUILD_ID = '1289789596238086194';
 const SESSION_CHANNEL = '1470597340992901204';
 const VOTE_CHANNEL = '1471995054238208223';
 const NAME_CHANNEL = '1480013219199451308';
-const PROTECTED_MSG = '1484750746099650683';
+const PROTECTED_MSG = '1484767856808689724';
+
 
 const WELCOME_TEXT = '1470597378116681812';
 const WELCOME_EMBED = '1470941203343216843';
@@ -191,16 +192,18 @@ if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !i
       
       switch (value) {
         case 'session_vote':
-          const modal = new ModalBuilder()
+const modal = new ModalBuilder()
             .setCustomId('vote_modal')
-            .setTitle('Vote Threshold');
+            .setTitle('Session Vote');
           const input = new TextInputBuilder()
             .setCustomId('threshold')
-            .setLabel('Votes needed')
+            .setLabel('How many votes do you wish the session vote receive before you are notified to begin a new session?')
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder('5');
+            .setPlaceholder('1-14')
+            .setMaxLength(2);
           modal.addComponents(new ActionRowBuilder().addComponents(input));
           return interaction.showModal(modal);
+
         
         case 'session_start':
           if (isActive) return interaction.followUp({ content: 'Session already active!', ephemeral: true });
@@ -241,12 +244,13 @@ if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !i
           const parentCat = guild.channels.cache.get(SESSION_PARENT_CAT);
           if (parentCh && parentCat) {
             try {
-              const divider = await guild.channels.create({
-                name: '⎯⎯⎯⎯⎯⎯',
+const divider = await guild.channels.create({
+                name: '⎯⎯⎯⎯⎯⎯⎯',
                 type: ChannelType.GuildVoice,
                 position: parentCh.position + 1,
                 permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]
               });
+
               const ingame = await guild.channels.create({
                 name: 'In-Game: LCsRp',
                 type: ChannelType.GuildVoice,
@@ -265,11 +269,12 @@ if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !i
               const updateInterval = setInterval(async () => {
                 const playersVc = guild.channels.cache.get(players.id);
                 if (playersVc) {
-                  const randomPlayers = Math.floor(Math.random() * 10) + 1;
-                  await playersVc.setName(`Players: ${randomPlayers}/40`);
+                  const randomPlayers = Math.floor(Math.random() * 11);
+                  await playersVc.setName(`Players: ${randomPlayers}/10`);
                 }
-              }, 120000);
+              }, 300000); // 5min
               sessionData.vcUpdateInterval = updateInterval;
+
             } catch (e) {
               console.error('VC creation error:', e);
             }
@@ -690,10 +695,10 @@ async function addBal(userId, amt, logBy = null) {
 
 // Helper functions
 async function getSessionActive(guild) {
-
-  const nameCh = guild.channels.cache.get(NAME_CHANNEL);
-  return nameCh ? nameCh.name.includes('🟢') : false;
+  const statusVc = guild.channels.cache.get(SESSION_PARENT_CHANNEL);
+  return statusVc ? statusVc.name.includes('🟢') : false;
 }
+
 
 async function getStaffCount(guild) {
   const staffRole = guild.roles.cache.get('1470596847423852758');
@@ -813,9 +818,10 @@ async function shutdownSession(guild) {
 
 // Helper functions (called from events)
 async function set_active(guild, active) {
-  const c = guild.channels.cache.get(NAME_CHANNEL);
-  if (c) await c.setName(active ? 'Sessions: 🟢' : 'Sessions: 🔴');
+  const statusVc = guild.channels.cache.get(SESSION_PARENT_CHANNEL);
+  if (statusVc) await statusVc.setName(active ? 'Sessions: 🟢' : 'Sessions: 🔴');
 }
+
 
 
 
