@@ -1156,6 +1156,8 @@ function renderSessionHistory(page = 0, limit = 10) {
 
 // Helper functions
 async function getSessionActive(guild) {
+  return sessionData.active;
+}
 
 async function getStaffCount(guild) {
   const staffRole = guild.roles.cache.get('1470596847423852758');
