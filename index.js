@@ -20,7 +20,8 @@ const GUILD_ID = '1289789596238086194';
 const SESSION_CHANNEL = '1470597340992901204';
 const VOTE_CHANNEL = '1471995054238208223';
 const NAME_CHANNEL = '1480013219199451308';
-const PROTECTED_MSG = '1484777918633607228';
+const PROTECTED_MSG = '1484781311380951062';
+
 
 
 
@@ -795,7 +796,8 @@ async function clearSession(guild, keepStartEmbed = false) {
   if (!c) return;
   try {
     const messages = await c.messages.fetch({ limit: 50 });
-    const protectedMsg = '1480023088799416451';
+  const protectedMsg = '1484777918633607228';
+
     const startMsgId = sessionData.startMsgId;
     for (const msg of messages.values()) {
       if (msg.id !== protectedMsg && (!keepStartEmbed || msg.id !== startMsgId)) {
