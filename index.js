@@ -1,8 +1,5 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } = require('discord.js');
 const express = require('express');
-
-
-
 const path = require('path');
 
 const client = new Client({ 
@@ -22,13 +19,9 @@ const VOTE_CHANNEL = '1471995054238208223';
 const NAME_CHANNEL = '1480013219199451308';
 const PROTECTED_MSG = '1484784024491790469';
 
-
-
-
 const WELCOME_TEXT = '1470597378116681812';
 const WELCOME_EMBED = '1470941203343216843';
 const PING_ROLE = '1470597003292573787';
-
 
 const CHECKMARK_EMOJI = '1480018743714386070';
 
@@ -60,7 +53,6 @@ const TRAINING_REQ_CHANNEL = '1484757004386832434';
 const TRAINER_ROLE = '1470596876662345790';
 const TRAINEE_ROLE = '1470596894907695188';
 
-
 let sessionData = { active: false, cooldowns: {}, pendingVotes: {}, starterId: null, startTime: null, checkTimers: [], voteMsgIds: [] };
 let afkUsers = {}; // {userId: {reason, oldNick, pings: []}}
 
@@ -72,14 +64,14 @@ app.get('/', (req, res) => res.json({ status: 'alive' }));
 app.get('/status', (req, res) => res.json({ status: 'alive', bot: client.isReady() ? 'ready' : 'starting' }));
 
 const port = process.env.PORT || 5000;
-app.listen(port, '0.0.0.0', () => console.log(`Flask on port ${port}`));
+app.listen(port, '0.0.0.0', () => console.log(`Server on port ${port}`));
 
 client.once('ready', async () => {
   console.log(`${client.user.tag} ready!`);
   client.user.setPresence({ activities: [{ name: 'Liberty County | dsc.gg/lcsrpc', type: 3 }] });
   const guild = client.guilds.cache.get(GUILD_ID);
   if (guild) {
-await guild.commands.set([
+    await guild.commands.set([
       {
         name: 'sessions',
         description: 'Sessions panel'
@@ -170,7 +162,7 @@ await guild.commands.set([
 });
 
 client.on('interactionCreate', async interaction => {
-if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !interaction.isButton() && !interaction.isModalSubmit()) return;
+  if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !interaction.isButton() && !interaction.isModalSubmit()) return;
   
   if (interaction.isStringSelectMenu()) {
     if (interaction.customId === 'starter_check' || interaction.customId === 'mgmt_check') {
@@ -200,8 +192,8 @@ if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !i
       const isActive = await getSessionActive(guild);
       
       switch (value) {
-case 'session_vote':
-  const modal = new ModalBuilder()
+        case 'session_vote':
+          const modal = new ModalBuilder()
             .setCustomId('vote_modal')
             .setTitle('Session Vote');
           const input = new TextInputBuilder()
@@ -213,8 +205,7 @@ case 'session_vote':
             .setMaxLength(2);
           modal.addComponents(new ActionRowBuilder().addComponents(input));
           await interaction.showModal(modal);
-
-
+          break;
         
         case 'session_start':
           if (isActive) return interaction.followUp({ content: 'Session already active!', ephemeral: true });
@@ -255,10 +246,28 @@ case 'session_vote':
           const parentCat = guild.channels.cache.get(SESSION_PARENT_CAT);
           if (parentCh && parentCat) {
             try {
-const divider = await guild.channels.create({\n                name: '⎯⎯⎯⎯⎯⎯⎯',\n                type: ChannelType.GuildVoice,\n                parent: parentCat.id,\n                position: parentCh.position + 1,\n                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]\n              });
+              const divider = await guild.channels.create({
+                name: '-------',
+                type: ChannelType.GuildVoice,
+                parent: parentCat.id,
+                position: parentCh.position + 1,
+                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]
+              });
 
-const ingame = await guild.channels.create({\n                name: 'In-Game: LCsRp',\n                type: ChannelType.GuildVoice,\n                parent: parentCat.id,\n                position: divider.position + 1,\n                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]\n              });
-const players = await guild.channels.create({\n                name: 'Players: 0/40',\n                type: ChannelType.GuildVoice,\n                parent: parentCat.id,\n                position: ingame.position + 1,\n                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]\n              });
+              const ingame = await guild.channels.create({
+                name: 'In-Game: LCsRp',
+                type: ChannelType.GuildVoice,
+                parent: parentCat.id,
+                position: divider.position + 1,
+                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]
+              });
+              const players = await guild.channels.create({
+                name: 'Players: 0/40',
+                type: ChannelType.GuildVoice,
+                parent: parentCat.id,
+                position: ingame.position + 1,
+                permissionOverwrites: [{ id: guild.id, deny: ['Connect', 'Speak', 'Stream', 'UseVoiceActivation'], allow: ['ViewChannel'] }]
+              });
               sessionData.vcChannels = [divider.id, ingame.id, players.id];
               sessionData.playersVcId = players.id;
               // Update players every 2min
@@ -270,20 +279,18 @@ const players = await guild.channels.create({\n                name: 'Players: 0
                 }
               }, 300000); // 5min
               sessionData.vcUpdateInterval = updateInterval;
-
             } catch (e) {
               console.error('VC creation error:', e);
             }
           }
           
           // Schedule 1h DM
-  const timer1 = setTimeout(async () => {
+          const timer1 = setTimeout(async () => {
             await dmSessionCheck(guild, sessionData.starterId); // First to starter
           }, 3600000);
           sessionData.checkTimers.push(timer1);
           interaction.followUp({ content: 'Session started!', ephemeral: true });
           break;
-
         
         case 'session_boost':
           if (!isActive) return interaction.followUp({ content: 'No active session!', ephemeral: true });
@@ -318,7 +325,7 @@ const players = await guild.channels.create({\n                name: 'Players: 0
           await set_active(guild, false);
           const sessionChD = guild.channels.cache.get(SESSION_CHANNEL);
           if (sessionChD) {
-        const embed1d = new EmbedBuilder().setDescription(`A session has been shut down by **${member.displayName}**. Thank you for joining today's session. See you soon!`).setColor(0xffffff);
+            const embed1d = new EmbedBuilder().setDescription(`A session has been shut down by **${member.displayName}**. Thank you for joining today's session. See you soon!`).setColor(0xffffff);
             const embed2d = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
             await sessionChD.send({ embeds: [embed1d, embed2d] });
           }
@@ -340,16 +347,13 @@ const players = await guild.channels.create({\n                name: 'Players: 0
   
   if (interaction.isChatInputCommand()) {
     const { commandName } = interaction;
-    
 
-  // Channel check for economy slash
-  if (!BOT_CHANNELS.includes(interaction.channel.id) && ['balance', 'bal', 'work', 'daily', 'leaderboard', 'lb'].includes(commandName)) {
-    return interaction.reply({ content: 'Economy commands only in bot channels!', ephemeral: true });
-  }
+    // Channel check for economy slash
+    if (!BOT_CHANNELS.includes(interaction.channel.id) && ['balance', 'bal', 'work', 'daily', 'leaderboard', 'lb'].includes(commandName)) {
+      return interaction.reply({ content: 'Economy commands only in bot channels!', ephemeral: true });
+    }
 
-  
-if (commandName === 'sessions') {
-
+    if (commandName === 'sessions') {
       if (!MGMT_ROLES.some(id => interaction.member.roles.cache.has(id))) {
         return interaction.reply({ content: 'Only Management+ staff members of Liberty County State Roleplay Community are permitted to manage a session. Refrain from using this command again, unless you become Management.', ephemeral: true });
       }
@@ -366,7 +370,7 @@ if (commandName === 'sessions') {
       
       const embed2 = new EmbedBuilder()
         .setTitle(`${LCSRPC_EMOJI} | Session Management`)
-        .setDescription(`> Welcome, ${interaction.member.toString()}. Thanks for opening Liberty County State Roleplay Community\\'s Session Management panel.\\n\\n${statusText}\\n\\nPlease click the options below to manage the session further.\\n\\n${optionsText}`)
+        .setDescription(`> Welcome, ${interaction.member.toString()}. Thanks for opening Liberty County State Roleplay Community's Session Management panel.\\n\\n${statusText}\\n\\nPlease click the options below to manage the session further.\\n\\n${optionsText}`)
         .setColor(0xffffff);
       
       const embed3 = new EmbedBuilder()
@@ -447,32 +451,32 @@ if (commandName === 'sessions') {
     }
   }
 
-if (interaction.isButton()) {
+  if (interaction.isButton()) {
     // Legacy buttons disabled - use dropdown
     return interaction.reply({ content: 'Use /sessions dropdown instead!', ephemeral: true });
   }
 
-if (interaction.isModalSubmit() && interaction.customId === 'vote_modal') {
-  const t = parseInt(interaction.fields.getTextInputValue('threshold'));
-  if (isNaN(t) || t < 1) {
-    return interaction.reply({ content: 'Invalid number!', ephemeral: true });
+  if (interaction.isModalSubmit() && interaction.customId === 'vote_modal') {
+    const t = parseInt(interaction.fields.getTextInputValue('threshold'));
+    if (isNaN(t) || t < 1) {
+      return interaction.reply({ content: 'Invalid number!', ephemeral: true });
+    }
+    const c = interaction.guild.channels.cache.get(VOTE_CHANNEL);
+    if (!c) return interaction.reply({ content: 'No vote channel!', ephemeral: true });
+    
+    const embed1 = new EmbedBuilder().setImage(HEAD_IMG).setColor(0xffffff);
+    const embed2 = new EmbedBuilder()
+      .setTitle(`${LCSRPC_EMOJI} | LCSRPC Session Voting`)
+      .setDescription(`> A session voting has been started by ${interaction.user.displayName}. \\n> - If you would like the session to start, please react below with <:Checkmark:${CHECKMARK_EMOJI}>. Once the session reaches ${t}, the session will begin. \\n> - Votes: 0/${t}`)
+      .setColor(0xffffff);
+    const embed3 = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
+    
+    const m = await c.send({ embeds: [embed1, embed2, embed3] });
+    await m.react(`<:Checkmark:${CHECKMARK_EMOJI}>`);
+    sessionData.pendingVotes[m.id] = { threshold: t, initiatorId: interaction.user.id };
+    sessionData.voteMsgIds.push(m.id);
+    interaction.reply({ content: 'Vote posted in staff-chat!', ephemeral: true });
   }
-  const c = interaction.guild.channels.cache.get(VOTE_CHANNEL);
-  if (!c) return interaction.reply({ content: 'No vote channel!', ephemeral: true });
-  
-  const embed1 = new EmbedBuilder().setImage(HEAD_IMG).setColor(0xffffff);
-  const embed2 = new EmbedBuilder()
-    .setTitle(`${LCSRPC_EMOJI} | LCSRPC Session Voting`)
-    .setDescription(`> A session voting has been started by ${interaction.user.displayName}. \\n> - If you would like the session to start, please react below with <:Checkmark:${CHECKMARK_EMOJI}>. Once the session reaches ${t}, the session will begin. \\n> - Votes: 0/${t}`)
-    .setColor(0xffffff);
-  const embed3 = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
-  
-  const m = await c.send({ embeds: [embed1, embed2, embed3] });
-  await m.react(`<:Checkmark:${CHECKMARK_EMOJI}>`);
-  sessionData.pendingVotes[m.id] = { threshold: t, initiatorId: interaction.user.id };
-  sessionData.voteMsgIds.push(m.id);
-  interaction.reply({ content: 'Vote posted in staff-chat!', ephemeral: true });
-}
 });
 
 client.on('messageCreate', async message => {
@@ -526,8 +530,8 @@ client.on('messageCreate', async message => {
     }
   });
   
-
-// Channel check for economy cmds only
+  // Channel check for economy cmds only
+  const command = message.content.slice(1).trim().split(/ +/)[0]?.toLowerCase();
   if (!BOT_CHANNELS.includes(message.channel.id) && ['bal', 'balance', 'work', 'daily', 'lb', 'leaderboard'].includes(command)) {
     message.delete().catch(() => {});
     const errorEmbed = new EmbedBuilder()
@@ -538,13 +542,11 @@ client.on('messageCreate', async message => {
     return;
   }
 
-
   const args = message.content.slice(1).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
+  const cmd = args.shift()?.toLowerCase();
 
-if (command === 'sessions') {
-
-    if (command === 'sessions' && (message.guild.id !== GUILD_ID || !MGMT_ROLES.some(id => message.member.roles.cache.has(id)))) {
+  if (cmd === 'sessions') {
+    if (message.guild.id !== GUILD_ID || !MGMT_ROLES.some(id => message.member.roles.cache.has(id))) {
       const errorMsg = await message.reply('Only Management+ staff members of Liberty County State Roleplay Community are permitted to manage a session. Refrain from using this command again, unless you become Management.');
       setTimeout(() => {
         message.delete().catch(() => {});
@@ -566,7 +568,7 @@ if (command === 'sessions') {
     
     const embed2 = new EmbedBuilder()
       .setTitle(`${LCSRPC_EMOJI} | Session Management`)
-      .setDescription(`> Welcome, ${message.member.toString()}. Thanks for opening Liberty County State Roleplay Community\\'s Session Management panel.\\n\\n${statusText}\\n\\nPlease click the options below to manage the session further.\\n\\n${optionsText}`)
+      .setDescription(`> Welcome, ${message.member.toString()}. Thanks for opening Liberty County State Roleplay Community's Session Management panel.\\n\\n${statusText}\\n\\nPlease click the options below to manage the session further.\\n\\n${optionsText}`)
       .setColor(0xffffff);
     
     const embed3 = new EmbedBuilder()
@@ -593,14 +595,14 @@ if (command === 'sessions') {
     
     await message.reply({ embeds: [embed1, embed2, embed3], components: [row] });
     await message.delete(); // Auto-delete command
-  } else if (['bal', 'balance'].includes(command)) {
+  } else if (['bal', 'balance'].includes(cmd)) {
     const bal = await getBal(message.author.id);
     const embed = new EmbedBuilder()
       .setImage(ECON_HEADER_IMG)
       .setDescription(`**Balance:** $${bal.toLocaleString()}`)
       .setColor(0x00ff00);
     message.reply({ embeds: [embed] });
-  } else if (command === 'work') {
+  } else if (cmd === 'work') {
     const cdKey = `work_${message.author.id}`;
     const now = Date.now();
     if (sessionData.cooldowns[cdKey] && now - sessionData.cooldowns[cdKey] < 3600000) {
@@ -612,10 +614,10 @@ if (command === 'sessions') {
     const newBal = await addBal(message.author.id, reward, message.author.id);
     const embed = new EmbedBuilder()
       .setImage(ECON_HEADER_IMG)
-      .setDescription(`**Worked! +$${reward}**\\n**New Balance: $${newBal.toLocaleString()}**`)
+      .setDescription(`**Worked! +$${reward}**\n**New Balance: $${newBal.toLocaleString()}**`)
       .setColor(0x00ff00);
     message.reply({ embeds: [embed] });
-  } else if (command === 'daily') {
+  } else if (cmd === 'daily') {
     const cdKey = `daily_${message.author.id}`;
     const now = Date.now();
     if (sessionData.cooldowns[cdKey] && now - sessionData.cooldowns[cdKey] < 86400000) {
@@ -627,10 +629,10 @@ if (command === 'sessions') {
     const newBal = await addBal(message.author.id, reward, message.author.id);
     const embed = new EmbedBuilder()
       .setImage(ECON_HEADER_IMG)
-      .setDescription(`**Daily reward! +$${reward}**\\n**New Balance: $${newBal.toLocaleString()}**`)
+      .setDescription(`**Daily reward! +$${reward}**\n**New Balance: $${newBal.toLocaleString()}**`)
       .setColor(0x00ff00);
     message.reply({ embeds: [embed] });
-  } else if (['lb', 'leaderboard'].includes(command)) {
+  } else if (['lb', 'leaderboard'].includes(cmd)) {
     const sorted = Object.entries(economyData.users).sort(([,a], [,b]) => b - a).slice(0, 10);
     const lbList = sorted.map(([id, bal], i) => `\`${i+1}.\` <@${id}> $${bal.toLocaleString()}`).join('\\n');
     const embed = new EmbedBuilder()
@@ -639,7 +641,7 @@ if (command === 'sessions') {
       .setColor(0x00ff88)
       .setImage(ECON_HEADER_IMG);
     message.reply({ embeds: [embed] });
-  } else if (command === 'requesttraining') {
+  } else if (cmd === 'requesttraining') {
     const reqCh = client.channels.cache.get(TRAINING_REQ_CHANNEL);
     if (message.channel.id !== TRAINING_REQ_CHANNEL) {
       return message.reply('Training requests in <#' + TRAINING_REQ_CHANNEL + '> only!').then(m => setTimeout(() => m.delete(), 10000));
@@ -655,11 +657,11 @@ if (command === 'sessions') {
     const reqEmbed1 = new EmbedBuilder().setImage(HEAD_IMG).setColor(0xffffff);
     const reqEmbed2 = new EmbedBuilder()
       .setTitle(`${LCSRPC_EMOJI} | Training Request`)
-      .setDescription(`**${message.member.displayName}** requests training.\\n> Session active. Assign trainer.`)
+      .setDescription(`**${message.member.displayName}** requests training.\n> Session active. Assign trainer.`)
       .setColor(0xffffff);
     const reqEmbed3 = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
     message.channel.send({ content: `${trainerPing}`, embeds: [reqEmbed1, reqEmbed2, reqEmbed3] });
-  } else if (command === 'afk') {
+  } else if (cmd === 'afk') {
     const reason = args.join(' ') || 'AFK';
     const oldNick = message.member.displayName;
     afkUsers[message.author.id] = { reason, oldNick, pings: [] };
@@ -667,8 +669,7 @@ if (command === 'sessions') {
     message.reply(`**AFK: ${reason}**`).then(m => setTimeout(() => m.delete(), 10000));
   }
 
-
-  if (command === 'say') {
+  if (cmd === 'say') {
     if (message.guild.id !== GUILD_ID || !ADMIN_ROLES.some(id => message.member.roles.cache.has(id))) {
       return message.reply('No!').then(m => setTimeout(() => m.delete(), 5000));
     }
@@ -677,7 +678,7 @@ if (command === 'sessions') {
     message.channel.send(msg);
   }
 
-  if (command === 'dmuser') {
+  if (cmd === 'dmuser') {
     if (message.guild.id !== GUILD_ID || !ADMIN_ROLES.some(id => message.member.roles.cache.has(id))) {
       return message.reply('No!').then(m => setTimeout(() => m.delete(), 5000));
     }
@@ -699,7 +700,7 @@ if (command === 'sessions') {
     }
   }
 
-  if (command === 'dmrole') {
+  if (cmd === 'dmrole') {
     if (message.guild.id !== GUILD_ID || !message.member.roles.cache.has(LEADERSHIP_ROLE)) {
       return message.reply('Leadership only!').then(m => setTimeout(() => m.delete(), 5000));
     }
@@ -752,7 +753,6 @@ client.on('guildMemberAdd', member => {
   }
 });
 
-
 let economyData = { users: {}, logs: [] };
 
 async function getBal(userId) {
@@ -774,13 +774,11 @@ async function addBal(userId, amt, logBy = null) {
   return bal;
 }
 
-
 // Helper functions
 async function getSessionActive(guild) {
   const statusVc = guild.channels.cache.get(SESSION_PARENT_CHANNEL);
   return statusVc ? statusVc.name.includes('🟢') : false;
 }
-
 
 async function getStaffCount(guild) {
   const staffRole = guild.roles.cache.get('1470596847423852758');
@@ -792,7 +790,7 @@ async function clearSession(guild, keepStartEmbed = false) {
   if (!c) return;
   try {
     const messages = await c.messages.fetch({ limit: 50 });
-const protectedMsg = PROTECTED_MSG;
+    const protectedMsg = PROTECTED_MSG;
 
     const startMsgId = sessionData.startMsgId;
     for (const msg of messages.values()) {
@@ -811,7 +809,7 @@ async function dmSessionCheck(guild, targetId, first = false) {
   const embed1 = new EmbedBuilder().setImage(HEAD_IMG).setColor(0xffffff);
   const embed2 = new EmbedBuilder()
     .setTitle(`${LCSRPC_EMOJI} | Session Management`)
-    .setDescription('As the session was started by you approximately an hour ago, please answer this question:\\n> Is it currently still active?')
+    .setDescription('As the session was started by you approximately an hour ago, please answer this question:\n> Is it currently still active?')
     .setColor(0xffffff);
   const embed3 = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
   const options = [
@@ -824,7 +822,7 @@ async function dmSessionCheck(guild, targetId, first = false) {
     .addOptions(options);
   const row = new ActionRowBuilder().addComponents(select);
   await target.send({ embeds: [embed1, embed2, embed3], components: [row] });
-console.log(`DM check sent to ${target.tag}`);
+  console.log(`DM check sent to ${target.tag}`);
   // Escalate stub: After 1h no resp, DM mgmt roles
   const escalateTimer = setTimeout(async () => {
     console.log('Escalating to mgmt roles');
@@ -850,7 +848,7 @@ async function startSession(guild, starterId) {
   const embed1s = new EmbedBuilder().setImage(HEAD_IMG).setColor(0xffffff);
   const embed2s = new EmbedBuilder()
     .setTitle(`${LCSRPC_EMOJI} | LCSRPC Session Started`)
-    .setDescription(`After votes received, a session has begun in Liberty County State Roleplay Community. Please refer below for more information.\\n- **In-Game Code:** \`LCsRp\`\\n- **Players:** 5/40\\n- **Staff Online:** ${staffCount}`)
+    .setDescription(`After votes received, a session has begun in Liberty County State Roleplay Community. Please refer below for more information.\n- **In-Game Code:** \`LCsRp\`\n- **Players:** 5/40\n- **Staff Online:** ${staffCount}`)
     .setColor(0xffffff);
   const embed3s = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
   const pingRole = guild.roles.cache.get(PING_ROLE);
@@ -864,7 +862,6 @@ async function startSession(guild, starterId) {
   sessionData.checkTimers.push(timer1);
   console.log('Session started, DM timer set');
 }
-
 
 async function shutdownSession(guild) {
   await clearSession(guild, false);
@@ -898,15 +895,11 @@ async function shutdownSession(guild) {
   console.log('Session auto-shutdown + VC cleaned');
 }
 
-
 // Helper functions (called from events)
 async function set_active(guild, active) {
   const statusVc = guild.channels.cache.get(SESSION_PARENT_CHANNEL);
   if (statusVc) await statusVc.setName(active ? 'Sessions: 🟢' : 'Sessions: 🔴');
 }
-
-
-
 
 client.on('messageReactionAdd', async (reaction, user) => {
   if (user.bot || reaction.emoji.id !== CHECKMARK_EMOJI) return;
