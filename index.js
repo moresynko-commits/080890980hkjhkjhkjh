@@ -79,9 +79,8 @@ const TICKET_ROLES = {
   partnership: BOD_ROLES
 };
 
-let openTickets = {}; // ticketChannelId -> {openerId, category, claimerId}
-let ticketCounter = 1;
 let openTickets = {}; // channelId -> { openerId, category, claimerId }
+let ticketCounter = 1; // channelId -> { openerId, category, claimerId }
 
 let sessionData = { active: false, cooldowns: {}, pendingVotes: {}, starterId: null, startTime: null, checkTimers: [], voteMsgIds: [] };
 let afkUsers = {}; // {userId: {reason, oldNick, pings: []}}
