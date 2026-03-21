@@ -60,8 +60,8 @@ class SessionsView(nextcord.ui.View):
 
     async def interaction_check(self, interaction):
         mgmt_roles = [1470596840369164288, 1470596832794251408, 1470596825575854223, 1470596818298601567]
-        if MANAGEMENT_ROLE not in [r.id for r in interaction.user.roles] and all(r.id not in mgmt_roles for r in interaction.user.roles):
-            await interaction.response.send_message("Management and above only!", ephemeral=True)
+        if all(r.id not in mgmt_roles for r in interaction.user.roles):
+            await interaction.response.send_message("Mgmt+, Directors, Exec, Leadership only!", ephemeral=True)
             return False
         return True
 
@@ -133,15 +133,15 @@ async def clear_session(guild):
                 except:
                     pass
 
-@bot.command(aliases=["p"])
+@bot.command()
 async def sessions(ctx):
     mgmt_roles = [1470596840369164288, 1470596832794251408, 1470596825575854223, 1470596818298601567]
-    if MANAGEMENT_ROLE not in [r.id for r in ctx.author.roles] and all(r.id not in mgmt_roles for r in ctx.author.roles):
-        await ctx.send("Management and above only!", delete_after=5)
+    if all(r.id not in mgmt_roles for r in ctx.author.roles):
+        await ctx.send("Management+, Directors, Executives, Leadership only!", delete_after=5)
         return
-    e = nextcord.Embed(title="Sessions Panel", color=0xffffff)
-    v = SessionsView()
-    await ctx.reply(embed=e, view=v, ephemeral=True)
+    embed = nextcord.Embed(title="Sessions Panel", description=f"Active: {session_data['active']}", color=0xffffff)
+    view = SessionsView()
+    await ctx.reply(embed=embed, view=view, ephemeral=True)
 
 @bot.event
 async def on_raw_reaction_add(payload):
