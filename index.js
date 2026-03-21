@@ -666,7 +666,7 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-client.on('messageCreate', async message => {
+client.on('messageCreate', async (message) => {
   const BOT_ID = '1484655890966777886';
   if (message.content.includes('<@1484655890966777886>')) {
     const guild = message.guild;
