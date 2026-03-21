@@ -198,7 +198,7 @@ if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !i
           await set_active(guild, false);
           const sessionChD = guild.channels.cache.get(SESSION_CHANNEL);
           if (sessionChD) {
-            const embed1d = new EmbedBuilder().setDescription(`A session has been shut down by **${member.displayName}**. Thank you for joining today’s session. See you soon!`).setColor(0xffffff);
+        const embed1d = new EmbedBuilder().setDescription(`A session has been shut down by **${member.displayName}**. Thank you for joining today's session. See you soon!`).setColor(0xffffff);
             const embed2d = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
             await sessionChD.send({ embeds: [embed1d, embed2d] });
           }
@@ -581,7 +581,7 @@ async function shutdownSession(guild) {
   await set_active(guild, false);
   const sessionChD = guild.channels.cache.get(SESSION_CHANNEL);
   if (sessionChD) {
-    const embed1d = new EmbedBuilder().setDescription('A session has been shut down automatically. Thank you for joining today\\'s session. See you soon!').setColor(0xffffff);
+    const embed1d = new EmbedBuilder().setDescription("A session has been shut down automatically. Thank you for joining today's session. See you soon!").setColor(0xffffff);
     const embed2d = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
     await sessionChD.send({ embeds: [embed1d, embed2d] });
   }
