@@ -1,13 +1,15 @@
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } = require('discord.js');
 const express = require('express');
 const path = require('path');
 
 const client = new Client({ 
-  intents: [
+intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages
-  ] 
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMessageReactions
+  ]
 });
 
 const token = process.env.BOT_TOKEN;
@@ -21,11 +23,15 @@ const WELCOME_EMBED = '1470941203343216843';
 const PING_ROLE = '1470597003292573787';
 const CHECKMARK_EMOJI = '1480018743714386070';
 
+const LCSRPC_EMOJI = '<:LCSRPC:1484385207455846513>';
+const HEAD_IMG = 'https://cdn.discordapp.com/attachments/1484676715010588793/1484693166270714007/lcsrpcsess.png?ex=69bf27c3&is=69bdd643&hm=07aba51b706c19670195fd44dc3f4a09f87a49f2abb8b2096cc97ee19158d06d&';
+const FOOTER_IMG = 'https://cdn.discordapp.com/attachments/1484676715010588793/1484678139601879170/infolo_1.png?ex=69bf19c4&is=69bdc844&hm=d4966d0d1c6f8faca710c8e1dc078ee1b47d9cb12b417450db6d18071f8ce8d3&';
+
 const MGMT_ROLES = ['1470596840369164288', '1470596832794251408', '1470596825575854223', '1470596818298601567'];
 const ADMIN_ROLES = ['1470596825575854223', '1470596832794251408', '1470596818298601567'];
 const LEADERSHIP_ROLE = '1470596818298601567';
 
-let sessionData = { active: false, cooldowns: {}, pendingVotes: {} };
+let sessionData = { active: false, cooldowns: {}, pendingVotes: {}, starterId: null, startTime: null, checkTimers: [], voteMsgIds: [] };
 
 const app = express();
 app.use(express.json());
@@ -91,24 +97,173 @@ client.once('ready', async () => {
 });
 
 client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand() && !interaction.isButton() && !interaction.isModalSubmit()) return;
+if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !interaction.isButton() && !interaction.isModalSubmit()) return;
+  
+  if (interaction.isStringSelectMenu()) {
+    if (interaction.customId === 'starter_check' || interaction.customId === 'mgmt_check') {
+      await interaction.deferUpdate();
+      const value = interaction.values[0];
+      const guild = interaction.guild || client.guilds.cache.get(GUILD_ID);
+      if (value === 'check_no') {
+        await shutdownSession(guild);
+        interaction.followUp({ content: 'Session shutdown via DM check.', ephemeral: true });
+      } else {
+        const timer = setTimeout(() => dmSessionCheck(guild, sessionData.starterId || 'unknown', false), 3600000);
+        sessionData.checkTimers.push(timer);
+        interaction.followUp({ content: 'Check rescheduled (1h).', ephemeral: true });
+      }
+      return;
+    }
+    
+    if (interaction.customId === 'session_menu') {
+      const guild = interaction.guild;
+      const value = interaction.values[0];
+      await interaction.deferUpdate();
+      const member = interaction.member;
+      if (!MGMT_ROLES.some(id => member.roles.cache.has(id))) {
+        return interaction.followUp({ content: 'Mgmt+ only!', ephemeral: true });
+      }
+      
+      const isActive = await getSessionActive(guild);
+      
+      switch (value) {
+        case 'session_vote':
+          const modal = new ModalBuilder()
+            .setCustomId('vote_modal')
+            .setTitle('Vote Threshold');
+          const input = new TextInputBuilder()
+            .setCustomId('threshold')
+            .setLabel('Votes needed')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('5');
+          modal.addComponents(new ActionRowBuilder().addComponents(input));
+          return interaction.showModal(modal);
+        
+        case 'session_start':
+          if (isActive) return interaction.followUp({ content: 'Session already active!', ephemeral: true });
+          await clearSession(guild, false);
+          await set_active(guild, true);
+          const staffCount = await getStaffCount(guild);
+          const embed1s = new EmbedBuilder().setImage(HEAD_IMG).setColor(0xffffff);
+          const embed2s = new EmbedBuilder()
+            .setTitle(`${LCSRPC_EMOJI} | LCSRPC Session Started`)
+            .setDescription(`After votes received, a session has begun in Liberty County State Roleplay Community. Please refer below for more information.\\n- **In-Game Code:** \`LCsRp\`\\n- **Players:** 5/40\\n- **Staff Online:** ${staffCount}`)
+            .setColor(0xffffff);
+          const embed3s = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
+          const pingRole = guild.roles.cache.get(PING_ROLE);
+          const sessionCh = guild.channels.cache.get(SESSION_CHANNEL);
+          if (!sessionCh || !pingRole) return interaction.followUp({ content: 'No session channel/ping role!', ephemeral: true });
+          const m = await sessionCh.send({ content: pingRole.toString(), embeds: [embed1s, embed2s, embed3s] });
+          sessionData.starterId = member.id;
+          sessionData.startTime = Date.now();
+          sessionData.startMsgId = m.id;
+          // Schedule 1h DM
+  const timer1 = setTimeout(async () => {
+            await dmSessionCheck(guild, sessionData.starterId); // First to starter
+          }, 3600000);
+          sessionData.checkTimers.push(timer1);
+          interaction.followUp({ content: 'Session started!', ephemeral: true });
+          break;
+        
+        case 'session_boost':
+          if (!isActive) return interaction.followUp({ content: 'No active session!', ephemeral: true });
+          const pingRoleB = guild.roles.cache.get(PING_ROLE);
+          const sessionChB = guild.channels.cache.get(SESSION_CHANNEL);
+          if (!sessionChB || !pingRoleB) return interaction.followUp({ content: 'No channel/ping!', ephemeral: true });
+          const embed1b = new EmbedBuilder().setImage(HEAD_IMG).setColor(0xffffff);
+          const embed2b = new EmbedBuilder()
+            .setDescription('The session is currently running **low** on players. Please join up to ensure that the server can be full!')
+            .setColor(0xffffff);
+          const embed3b = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
+          await sessionChB.send({ content: `@here, ${pingRoleB.toString()}`, embeds: [embed1b, embed2b, embed3b] });
+          await clearSession(guild, true); // Keep start embed
+          interaction.followUp({ content: 'Low/boost posted!', ephemeral: true });
+          break;
+        
+        case 'session_full':
+          if (!isActive) return interaction.followUp({ content: 'No active session!', ephemeral: true });
+          const sessionChF = guild.channels.cache.get(SESSION_CHANNEL);
+          if (!sessionChF) return interaction.followUp({ content: 'No channel!', ephemeral: true });
+          await sessionChF.send('The session has officially become full. Thank you so much for bringing up activity! \\n> There may be a queue in Liberty County State Roleplay Community (LCSRPC).');
+          interaction.followUp({ content: 'Full alert posted!', ephemeral: true });
+          break;
+        
+        case 'session_shutdown':
+          if (!isActive) return interaction.followUp({ content: 'No active session!', ephemeral: true });
+          const now = Date.now();
+          if (sessionData.startTime && now - sessionData.startTime < 15 * 60 * 1000) {
+            return interaction.followUp({ content: 'You are not permitted to shutdown a session unless 15 minutes has elapsed after the session started', ephemeral: true });
+          }
+          await clearSession(guild, false);
+          await set_active(guild, false);
+          const sessionChD = guild.channels.cache.get(SESSION_CHANNEL);
+          if (sessionChD) {
+            const embed1d = new EmbedBuilder().setDescription(`A session has been shut down by **${member.displayName}**. Thank you for joining today’s session. See you soon!`).setColor(0xffffff);
+            const embed2d = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
+            await sessionChD.send({ embeds: [embed1d, embed2d] });
+          }
+          // Clear state/timers
+          sessionData.starterId = null;
+          sessionData.startTime = null;
+          sessionData.startMsgId = null;
+          sessionData.checkTimers.forEach(clearTimeout);
+          sessionData.checkTimers = [];
+          interaction.followUp({ content: 'Session shutdown!', ephemeral: true });
+          break;
+        
+        default:
+          interaction.followUp({ content: 'Invalid option', ephemeral: true });
+      }
+    }
+    return;
+  }
   
   if (interaction.isChatInputCommand()) {
     const { commandName } = interaction;
     
-    if (commandName === 'sessions') {
+if (commandName === 'sessions') {
       if (!MGMT_ROLES.some(id => interaction.member.roles.cache.has(id))) {
-        return interaction.reply({ content: 'Mgmt+, Directors, Exec, Leadership only!', ephemeral: true });
+        return interaction.reply({ content: 'Only Management+ staff members of Liberty County State Roleplay Community are permitted to manage a session. Refrain from using this command again, unless you become Management.', ephemeral: true });
       }
-      const embed = new EmbedBuilder().setTitle('Sessions Panel').setDescription(`Active: ${sessionData.active}`).setColor(0xffffff);
-      const view = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('vote').setLabel('Vote').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId('start').setLabel('Start').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId('boost').setLabel('Boost').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('shutdown').setLabel('Shutdown').setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId('full').setLabel('Full').setStyle(ButtonStyle.Danger)
-      );
-      return interaction.reply({ embeds: [embed], components: [view], ephemeral: true });
+      const guild = interaction.guild;
+      const isActive = await getSessionActive(guild);
+      const statusText = isActive ? 'The Session is **currently active**.' : 'The Session is **currently inactive**.';
+      const optionsText = isActive 
+        ? '> - 1. **Boost** the Session. \\n> - 2. **Shutdown** the Session. \\n> - 3. **Alert** that the Session is full.'
+        : '> - 1. Initiate a Session **Vote**.\\n> - 2. **Start** a new Session.';
+      
+      const embed1 = new EmbedBuilder()
+        .setImage(HEAD_IMG)
+        .setColor(0xffffff);
+      
+      const embed2 = new EmbedBuilder()
+        .setTitle(`${LCSRPC_EMOJI} | Session Management`)
+        .setDescription(`> Welcome, ${interaction.member.toString()}. Thanks for opening Liberty County State Roleplay Community\\'s Session Management panel.\\n\\n${statusText}\\n\\nPlease click the options below to manage the session further.\\n\\n${optionsText}`)
+        .setColor(0xffffff);
+      
+      const embed3 = new EmbedBuilder()
+        .setImage(FOOTER_IMG)
+        .setColor(0xffffff);
+      
+      const options = isActive 
+        ? [
+            { label: 'Session Low/Boost', value: 'session_boost', description: 'Notify low players', emoji: '📈' },
+            { label: 'Session Full', value: 'session_full', description: 'Alert full', emoji: '✅' },
+            { label: 'Shutdown Session', value: 'session_shutdown', description: 'End session', emoji: '🔴' }
+          ]
+        : [
+            { label: 'Start Session Vote', value: 'session_vote', description: 'Vote threshold modal', emoji: '📊' },
+            { label: 'Start New Session', value: 'session_start', description: 'Ping start', emoji: '🟢' }
+          ];
+      
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('session_menu')
+        .setPlaceholder('Select session action...')
+        .addOptions(options);
+      
+      const row = new ActionRowBuilder().addComponents(select);
+      
+      return interaction.reply({ embeds: [embed1, embed2, embed3], components: [row], ephemeral: true });
     }
     
     if (commandName === 'say') {
@@ -164,78 +319,32 @@ client.on('interactionCreate', async interaction => {
     }
   }
 
-  if (interaction.isButton()) {
-    if (!MGMT_ROLES.some(id => interaction.member.roles.cache.has(id))) {
-      return interaction.reply({ content: 'Mgmt+ only!', ephemeral: true });
-    }
-
-    const id = interaction.customId;
-    const guild = interaction.guild;
-    const pingRole = guild.roles.cache.get(PING_ROLE);
-    const sessionCh = guild.channels.cache.get(SESSION_CHANNEL);
-
-    if (id === 'vote') {
-      const modal = new ModalBuilder()
-        .setCustomId('vote_modal')
-        .setTitle('Vote Threshold');
-      const input = new TextInputBuilder()
-        .setCustomId('threshold')
-        .setLabel('Votes needed')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('5');
-      modal.addComponents(new ActionRowBuilder().addComponents(input));
-      return interaction.showModal(modal);
-    }
-
-    if (id === 'start' && !sessionData.active && sessionCh && pingRole) {
-      sessionData.active = true;
-      set_active(guild, true);
-      clear_session(guild);
-      const embed = new EmbedBuilder().setTitle('Session Started').setDescription('LCsRp').setColor('00ff00');
-      sessionCh.send({ content: pingRole.toString(), embeds: [embed] });
-      interaction.reply({ content: 'Started!', ephemeral: true });
-    }
-
-    if (id === 'boost' && sessionData.active && sessionCh && pingRole) {
-      const embed = new EmbedBuilder().setTitle('Boost').setDescription('Join!').setColor(0x5865f2);
-      sessionCh.send({ content: pingRole.toString(), embeds: [embed] });
-      interaction.reply({ content: 'Boosted!', ephemeral: true });
-    }
-
-    if (id === 'shutdown' && sessionData.active && sessionCh) {
-      const now = Date.now();
-      if (sessionData.cooldowns.shutdown && now - sessionData.cooldowns.shutdown < 15 * 60 * 1000) {
-        return interaction.reply({ content: 'Cooldown!', ephemeral: true });
-      }
-      sessionData.active = false;
-      set_active(guild, false);
-      clear_session(guild);
-      const embed = new EmbedBuilder().setTitle('Shutdown').setDescription('Ended').setColor('ff0000');
-      sessionCh.send({ embeds: [embed] });
-      sessionData.cooldowns.shutdown = now;
-      interaction.reply({ content: 'Shutdown!', ephemeral: true });
-    }
-
-    if (id === 'full' && sessionData.active && sessionCh && pingRole) {
-      const embed = new EmbedBuilder().setTitle('Full').setDescription('Full!').setColor('ff0000');
-      sessionCh.send({ content: pingRole.toString(), embeds: [embed] });
-      interaction.reply({ content: 'Full!', ephemeral: true });
-    }
+if (interaction.isButton()) {
+    // Legacy buttons disabled - use dropdown
+    return interaction.reply({ content: 'Use /sessions dropdown instead!', ephemeral: true });
   }
 
-  if (interaction.isModalSubmit() && interaction.customId === 'vote_modal') {
-    const t = parseInt(interaction.fields.getTextInputValue('threshold'));
-    if (isNaN(t)) {
-      return interaction.reply({ content: 'Invalid number!', ephemeral: true });
-    }
-    const c = interaction.guild.channels.cache.get(VOTE_CHANNEL);
-    if (!c) return;
-    const embed = new EmbedBuilder().setTitle('Vote').setDescription(`React <:Checkmark:${CHECKMARK}> (${t} needed)`).setColor(0xffffff);
-    const m = await c.send({ embeds: [embed] });
-    await m.react(`<:${'Checkmark'}:${CHECKMARK}>`);
-    sessionData.pendingVotes[m.id] = t;
-    interaction.reply({ content: 'Vote posted!', ephemeral: true });
+if (interaction.isModalSubmit() && interaction.customId === 'vote_modal') {
+  const t = parseInt(interaction.fields.getTextInputValue('threshold'));
+  if (isNaN(t) || t < 1) {
+    return interaction.reply({ content: 'Invalid number!', ephemeral: true });
   }
+  const c = interaction.guild.channels.cache.get(VOTE_CHANNEL);
+  if (!c) return interaction.reply({ content: 'No vote channel!', ephemeral: true });
+  
+  const embed1 = new EmbedBuilder().setImage(HEAD_IMG).setColor(0xffffff);
+  const embed2 = new EmbedBuilder()
+    .setTitle(`${LCSRPC_EMOJI} | LCSRPC Session Voting`)
+    .setDescription(`> A session voting has been started by ${interaction.user.displayName}. \\n> - If you would like the session to start, please react below with <:Checkmark:${CHECKMARK_EMOJI}>. Once the session reaches ${t}, the session will begin. \\n> - Votes: 0/${t}`)
+    .setColor(0xffffff);
+  const embed3 = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
+  
+  const m = await c.send({ embeds: [embed1, embed2, embed3] });
+  await m.react(`<:Checkmark:${CHECKMARK_EMOJI}>`);
+  sessionData.pendingVotes[m.id] = { threshold: t, initiatorId: interaction.user.id };
+  sessionData.voteMsgIds.push(m.id);
+  interaction.reply({ content: 'Vote posted in staff-chat!', ephemeral: true });
+}
 });
 
 client.on('messageCreate', async message => {
@@ -244,19 +353,55 @@ client.on('messageCreate', async message => {
   const args = message.content.slice(1).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  if (command === 'sessions') {
+if (command === 'sessions') {
     if (message.guild.id !== GUILD_ID || !MGMT_ROLES.some(id => message.member.roles.cache.has(id))) {
-      return message.reply('Mgmt+, Directors, Exec, Leadership only!').then(m => setTimeout(() => m.delete(), 5000));
+      const errorMsg = await message.reply('Only Management+ staff members of Liberty County State Roleplay Community are permitted to manage a session. Refrain from using this command again, unless you become Management.');
+      setTimeout(() => {
+        message.delete().catch(() => {});
+        errorMsg.delete().catch(() => {});
+      }, 5000);
+      return;
     }
-    const embed = new EmbedBuilder().setTitle('Sessions Panel').setDescription(`Active: ${sessionData.active}`).setColor(0xffffff);
-    const view = [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('vote').setLabel('Vote').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('start').setLabel('Start').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('boost').setLabel('Boost').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('shutdown').setLabel('Shutdown').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('full').setLabel('Full').setStyle(ButtonStyle.Danger)
-    )];
-    await message.reply({ embeds: [embed], components: view });
+    const guild = message.guild;
+    const isActive = await getSessionActive(guild);
+    const statusText = isActive ? 'The Session is **currently active**.' : 'The Session is **currently inactive**.';
+    const optionsText = isActive 
+      ? '> - 1. **Boost** the Session. \\n> - 2. **Shutdown** the Session. \\n> - 3. **Alert** that the Session is full.'
+      : '> - 1. Initiate a Session **Vote**.\\n> - 2. **Start** a new Session.';
+    
+    const embed1 = new EmbedBuilder()
+      .setImage(HEAD_IMG)
+      .setColor(0xffffff);
+    
+    const embed2 = new EmbedBuilder()
+      .setTitle(`${LCSRPC_EMOJI} | Session Management`)
+      .setDescription(`> Welcome, ${message.member.toString()}. Thanks for opening Liberty County State Roleplay Community\\'s Session Management panel.\\n\\n${statusText}\\n\\nPlease click the options below to manage the session further.\\n\\n${optionsText}`)
+      .setColor(0xffffff);
+    
+    const embed3 = new EmbedBuilder()
+      .setImage(FOOTER_IMG)
+      .setColor(0xffffff);
+    
+    const options = isActive 
+      ? [
+          { label: 'Session Low/Boost', value: 'session_boost', description: 'Notify low players', emoji: '📈' },
+          { label: 'Session Full', value: 'session_full', description: 'Alert full', emoji: '✅' },
+          { label: 'Shutdown Session', value: 'session_shutdown', description: 'End session', emoji: '🔴' }
+        ]
+      : [
+          { label: 'Start Session Vote', value: 'session_vote', description: 'Vote threshold modal', emoji: '📊' },
+          { label: 'Start New Session', value: 'session_start', description: 'Ping start', emoji: '🟢' }
+        ];
+    
+    const select = new StringSelectMenuBuilder()
+      .setCustomId('session_menu')
+      .setPlaceholder('Select session action...')
+      .addOptions(options);
+    
+    const row = new ActionRowBuilder().addComponents(select);
+    
+    await message.reply({ embeds: [embed1, embed2, embed3], components: [row] });
+    await message.delete(); // Auto-delete command
   }
 
   if (command === 'say') {
@@ -343,23 +488,153 @@ client.on('guildMemberAdd', member => {
   }
 });
 
-// Helper functions (called from events)
-async function set_active(guild, active) {
-  const c = guild.channels.cache.get(NAME_CHANNEL);
-  if (c) await c.setName(active ? '🟢 Sessions' : '🔴 Sessions');
+// Helper functions
+async function getSessionActive(guild) {
+  const nameCh = guild.channels.cache.get(NAME_CHANNEL);
+  return nameCh ? nameCh.name.includes('🟢') : false;
 }
 
-async function clear_session(guild) {
+async function getStaffCount(guild) {
+  const staffRole = guild.roles.cache.get('1470596847423852758');
+  return staffRole ? staffRole.members.filter(m => !m.user.bot).size : 0;
+}
+
+async function clearSession(guild, keepStartEmbed = false) {
   const c = guild.channels.cache.get(SESSION_CHANNEL);
   if (!c) return;
   try {
     const messages = await c.messages.fetch({ limit: 50 });
+    const protectedMsg = '1480023088799416451';
+    const startMsgId = sessionData.startMsgId;
     for (const msg of messages.values()) {
-      if (msg.id !== PROTECTED_MSG) {
+      if (msg.id !== protectedMsg && (!keepStartEmbed || msg.id !== startMsgId)) {
         await msg.delete().catch(() => {});
       }
     }
-  } catch {}
+  } catch (e) {
+    console.error('Clear session error:', e);
+  }
 }
+
+async function dmSessionCheck(guild, targetId, first = false) {
+  const target = await client.users.fetch(targetId).catch(() => null);
+  if (!target) return;
+  const embed1 = new EmbedBuilder().setImage(HEAD_IMG).setColor(0xffffff);
+  const embed2 = new EmbedBuilder()
+    .setTitle(`${LCSRPC_EMOJI} | Session Management`)
+    .setDescription('As the session was started by you approximately an hour ago, please answer this question:\\n> Is it currently still active?')
+    .setColor(0xffffff);
+  const embed3 = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
+  const options = [
+    { label: 'Yes', value: 'check_yes' },
+    { label: 'No', value: 'check_no' }
+  ];
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(first ? 'starter_check' : 'mgmt_check')
+    .setPlaceholder('Respond...')
+    .addOptions(options);
+  const row = new ActionRowBuilder().addComponents(select);
+  await target.send({ embeds: [embed1, embed2, embed3], components: [row] });
+console.log(`DM check sent to ${target.tag}`);
+  // Escalate stub: After 1h no resp, DM mgmt roles
+  const escalateTimer = setTimeout(async () => {
+    console.log('Escalating to mgmt roles');
+    for (const roleId of MGMT_ROLES) {
+      const role = guild.roles.cache.get(roleId);
+      if (role) {
+        role.members.fetch().then(members => {
+          members.filter(m => !m.user.bot).forEach(async (mem) => {
+            await dmSessionCheck(guild, mem.id, false);
+          });
+        });
+      }
+    }
+  }, 3600000);
+  sessionData.checkTimers.push(escalateTimer);
+}
+
+async function startSession(guild, starterId) {
+  if (await getSessionActive(guild)) return console.log('Session already active');
+  await clearSession(guild, false);
+  await set_active(guild, true);
+  const staffCount = await getStaffCount(guild);
+  const embed1s = new EmbedBuilder().setImage(HEAD_IMG).setColor(0xffffff);
+  const embed2s = new EmbedBuilder()
+    .setTitle(`${LCSRPC_EMOJI} | LCSRPC Session Started`)
+    .setDescription(`After votes received, a session has begun in Liberty County State Roleplay Community. Please refer below for more information.\\n- **In-Game Code:** \`LCsRp\`\\n- **Players:** 5/40\\n- **Staff Online:** ${staffCount}`)
+    .setColor(0xffffff);
+  const embed3s = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
+  const pingRole = guild.roles.cache.get(PING_ROLE);
+  const sessionCh = guild.channels.cache.get(SESSION_CHANNEL);
+  if (!sessionCh || !pingRole) return;
+  const m = await sessionCh.send({ content: pingRole.toString(), embeds: [embed1s, embed2s, embed3s] });
+  sessionData.starterId = starterId;
+  sessionData.startTime = Date.now();
+  sessionData.startMsgId = m.id;
+  const timer1 = setTimeout(() => dmSessionCheck(guild, starterId, true), 3600000);
+  sessionData.checkTimers.push(timer1);
+  console.log('Session started, DM timer set');
+}
+
+async function shutdownSession(guild) {
+  await clearSession(guild, false);
+  await set_active(guild, false);
+  const sessionChD = guild.channels.cache.get(SESSION_CHANNEL);
+  if (sessionChD) {
+    const embed1d = new EmbedBuilder().setDescription('A session has been shut down automatically. Thank you for joining today\\'s session. See you soon!').setColor(0xffffff);
+    const embed2d = new EmbedBuilder().setImage(FOOTER_IMG).setColor(0xffffff);
+    await sessionChD.send({ embeds: [embed1d, embed2d] });
+  }
+  sessionData.starterId = null;
+  sessionData.startTime = null;
+  sessionData.startMsgId = null;
+  sessionData.checkTimers.forEach(t => clearTimeout(t));
+  sessionData.checkTimers = [];
+  console.log('Session auto-shutdown');
+}
+
+// Helper functions (called from events)
+async function set_active(guild, active) {
+  const c = guild.channels.cache.get(NAME_CHANNEL);
+  if (c) await c.setName(active ? 'Sessions: 🟢' : 'Sessions: 🔴');
+}
+
+
+
+client.on('messageReactionAdd', async (reaction, user) => {
+  if (user.bot || reaction.emoji.id !== CHECKMARK_EMOJI) return;
+  const msgId = reaction.message.id;
+  const data = sessionData.pendingVotes[msgId];
+  if (!data) return;
+  const checkReact = reaction.message.reactions.cache.get(`<:Checkmark:${CHECKMARK_EMOJI}>`);
+  const count = (checkReact ? checkReact.count : 0) - 1;
+  if (count >= data.threshold) {
+    console.log('Vote threshold reached, auto-starting session');
+    await startSession(reaction.message.guild, data.initiatorId);
+    delete sessionData.pendingVotes[msgId];
+  }
+});
+
+client.on('messageReactionRemove', async (reaction, user) => {
+  if (user.bot || reaction.emoji.id !== CHECKMARK_EMOJI) return;
+  const msgId = reaction.message.id;
+  const data = sessionData.pendingVotes[msgId];
+  if (!data) return;
+  // Optional: Clean if count == 0
+});
+
+client.on('error', err => console.error('Discord Client Error:', err));
+client.on('warn', info => console.warn('Discord Client Warn:', info));
+client.on('shardDisconnect', (event, code) => console.log('Shard Disconnect:', code));
+
+setInterval(() => {
+  if (client.isReady()) {
+    client.user.setPresence({ 
+      activities: [{ name: 'Liberty County | dsc.gg/lcsrpc', type: 3 }], 
+      status: 'online' 
+    });
+    console.log('Presence updated');
+  }
+}, 30000);
 
 client.login(token);
