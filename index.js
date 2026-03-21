@@ -1276,9 +1276,10 @@ async function shutdownSession(guild) {
 
 // Helper functions (called from events)
 async function set_active(guild, active) {
+  sessionData.active = active;
   const statusVc = guild.channels.cache.get(SESSION_PARENT_CHANNEL);
   if (statusVc) await statusVc.setName(active ? 'Sessions: 🟢' : 'Sessions: 🔴');
- }
+}
 
 client.on('messageReactionAdd', async (reaction, user) => {
   if (user.bot || reaction.emoji.id !== CHECKMARK_EMOJI) return;
