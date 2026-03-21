@@ -1,6 +1,5 @@
 import nextcord
 from nextcord.ext import commands
-import nextcord.app_commands
 import flask
 import os
 import threading
@@ -144,17 +143,10 @@ class SessionsView(nextcord.ui.View):
         await c.send(r.mention, embed=e)
         await interaction.response.send_message("Full!", ephemeral=True)
 
-@bot.tree.command(guild=nextcord.Object(id=GUILD_ID), name="sessions", description="Sessions panel for Mgmt+")
-async def slash_sessions(interaction: nextcord.Interaction):
-    if all(r.id not in MGMT_ROLES for r in interaction.user.roles):
-        await interaction.response.send_message("Mgmt+, Directors, Exec, Leadership only!", ephemeral=True)
-        return
-    embed = nextcord.Embed(title="Sessions Panel", description=f"Active: {session_data['active']}", color=0xffffff)
-    view = SessionsView()
-    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
 @bot.command()
 async def sessions(ctx):
+    if ctx.guild.id != GUILD_ID:
+        return
     if all(r.id not in MGMT_ROLES for r in ctx.author.roles):
         await ctx.send("Mgmt+, Directors, Exec, Leadership only!", delete_after=5)
         return
@@ -184,22 +176,17 @@ async def on_raw_reaction_add(payload):
 @bot.event
 async def on_ready():
     logger.info(f'{bot.user} ready!')
-    try:
-        synced = await bot.tree.sync(guild=nextcord.Object(id=GUILD_ID))
-        logger.info(f"Synced {len(synced)} command(s)")
-    except Exception as e:
-        logger.error(e)
     await bot.change_presence(activity=nextcord.Activity(name="Liberty County | dsc.gg/lcsrpc", type=nextcord.ActivityType.watching))
 
 @bot.command()
 async def say(ctx, *, msg):
+    if ctx.guild.id != GUILD_ID:
+        return
     if not any(r.id in ADMIN_ROLES for r in ctx.author.roles):
         await ctx.send("No!", delete_after=5)
         return
     await ctx.message.delete()
     await ctx.send(msg)
-
-bot.tree.add_command(say)
 
 @bot.command()
 async def dmuser(ctx, uid: str, *, msg):
@@ -254,7 +241,7 @@ async def on_member_join(member):
     guild = member.guild
     if guild.id != GUILD_ID:
         return
-    # Text channel
+    # Text channel old format
     ch = bot.get_channel(1470597378116681812)
     if ch:
         human_count = len([m for m in guild.members if not m.bot])
@@ -262,7 +249,7 @@ async def on_member_join(member):
         emoji_badge = '<:Welcome0:1484564259395604572><:Welcome1:1484564289309380780><:Welcome2:1484564315888681000><:Welcome3:1484564376995234037>'
         msg = f"{emoji_badge} ** to Liberty County State Roleplay Community (LCSRPC), {member.mention}.** You are our `{human_count}{ordinal}` member. > Thanks for joining, and have a wonderful day!"
         await ch.send(msg)
-    # Embed channel
+    # Embed channel exact
     ch = bot.get_channel(1470941203343216843)
     if ch:
         await ch.send(member.mention)
