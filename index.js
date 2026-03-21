@@ -69,7 +69,7 @@ client.once('ready', async () => {
   client.user.setPresence({ activities: [{ name: 'Liberty County | dsc.gg/lcsrpc', type: 3 }] });
   const guild = client.guilds.cache.get(GUILD_ID);
   if (guild) {
-    await guild.commands.set([
+await guild.commands.set([
       {
         name: 'sessions',
         description: 'Sessions panel'
@@ -113,8 +113,48 @@ client.once('ready', async () => {
           description: 'Message',
           required: true
         }]
+      },
+      {
+        name: 'balance',
+        description: 'Check balance',
+      },
+      {
+        name: 'bal',
+        description: 'Check balance (alias)',
+      },
+      {
+        name: 'work',
+        description: 'Work for money (1h cd)'
+      },
+      {
+        name: 'daily',
+        description: 'Daily reward (24h cd)'
+      },
+      {
+        name: 'leaderboard',
+        description: 'Top balances',
+        name_localizations: { 'en-US': 'leaderboard', 'en-GB': 'lb' }
+      },
+      {
+        name: 'lb',
+        description: 'Top balances (alias)'
+      },
+      {
+        name: 'requesttraining',
+        description: 'Request staff training',
+      },
+      {
+        name: 'afk',
+        description: 'Set AFK',
+        options: [{
+          type: 3,
+          name: 'reason',
+          description: 'Reason (optional)',
+          required: false
+        }]
       }
     ]);
+
     console.log('Slash commands registered!');
   }
 });
@@ -489,9 +529,8 @@ client.on('messageCreate', async message => {
   const args = message.content.slice(1).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-if (command === 'sessions') {
-
-    if (message.guild.id !== GUILD_ID || !MGMT_ROLES.some(id => message.member.roles.cache.has(id))) {
+if (['sessions', 'bal', 'balance', 'work', 'daily', 'lb', 'leaderboard', 'requesttraining', 'afk'].includes(command)) {
+    if (command === 'sessions' && (message.guild.id !== GUILD_ID || !MGMT_ROLES.some(id => message.member.roles.cache.has(id)))) {
       const errorMsg = await message.reply('Only Management+ staff members of Liberty County State Roleplay Community are permitted to manage a session. Refrain from using this command again, unless you become Management.');
       setTimeout(() => {
         message.delete().catch(() => {});
@@ -500,6 +539,7 @@ if (command === 'sessions') {
       return;
     }
     const guild = message.guild;
+
     const isActive = await getSessionActive(guild);
     const statusText = isActive ? 'The Session is **currently active**.' : 'The Session is **currently inactive**.';
     const optionsText = isActive 
